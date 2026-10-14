@@ -18,6 +18,7 @@ import { StaffManagement } from './components/StaffManagement';
 import { ActivityLogs } from './components/ActivityLogs';
 import { DatabaseSchemaModal } from './components/DatabaseSchemaModal';
 import { ExcelUserFlowModal } from './components/ExcelUserFlowModal';
+import { ToastContainer } from './components/ToastContainer';
 import { DatabaseService } from './services/storage';
 import { Employee, SystemStats } from './types';
 
@@ -54,6 +55,7 @@ export default function App() {
             currentUser={currentUser}
             stats={stats}
             onNavigate={(view) => setCurrentView(view)}
+            onOpenSchema={() => setIsSchemaModalOpen(true)}
           />
         );
       case 'excel':
@@ -95,6 +97,7 @@ export default function App() {
             currentUser={currentUser}
             stats={stats}
             onNavigate={(view) => setCurrentView(view)}
+            onOpenSchema={() => setIsSchemaModalOpen(true)}
           />
         );
     }
@@ -162,6 +165,9 @@ export default function App() {
         isOpen={isExcelFlowModalOpen}
         onClose={() => setIsExcelFlowModalOpen(false)}
       />
+
+      {/* Global floating toast notification host */}
+      <ToastContainer />
     </div>
   );
 }

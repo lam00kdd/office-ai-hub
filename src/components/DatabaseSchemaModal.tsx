@@ -1,16 +1,100 @@
-import React, { useState } from 'react';
-import { Database, Table, Key, ShieldCheck, Download, Copy, Check, Server, Layout } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Database,
+  Table,
+  Key,
+  ShieldCheck,
+  Download,
+  Copy,
+  Check,
+  Server,
+  Layout,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  Zap,
+  Globe
+} from 'lucide-react';
+import {
+  getSupabaseCredentials,
+  saveSupabaseCredentials,
+  testSupabaseConnection,
+  syncSeedDataToSupabase
+} from '../services/supabaseClient';
+import { toast } from '../services/toast';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  defaultTab?: 'connect' | 'erd' | 'wireframe' | 'sql';
 }
 
-export const DatabaseSchemaModal: React.FC<Props> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'erd' | 'wireframe' | 'sql'>('erd');
+export const DatabaseSchemaModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  defaultTab = 'connect',
+}) => {
+  const [activeTab, setActiveTab] = useState<'connect' | 'erd' | 'wireframe' | 'sql'>(defaultTab);
   const [copied, setCopied] = useState(false);
 
+  // Connection settings state
+  const creds = getSupabaseCredentials();
+  const [url, setUrl] = useState(creds.url);
+  const [key, setKey] = useState(creds.key);
+  const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    connected: boolean;
+    latencyMs?: number;
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const c = getSupabaseCredentials();
+      setUrl(c.url);
+      setKey(c.key);
+      if (c.url && c.key) {
+        handleTestConnection(false);
+      }
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const handleTestConnection = async (showToast = true) => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      // Save current input before testing
+      saveSupabaseCredentials(url, key);
+      const res = await testSupabaseConnection();
+      setTestResult(res);
+      if (showToast) {
+        if (res.connected) {
+          toast.success(res.message, 'Supabase Cloud');
+        } else {
+          toast.error(res.message, 'Lỗi kết nối Supabase');
+        }
+      }
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSyncData = async () => {
+    setSyncing(true);
+    try {
+      const res = await syncSeedDataToSupabase();
+      if (res.success) {
+        toast.success(res.message, 'Đồng bộ Supabase thành công');
+      } else {
+        toast.error(res.message, 'Lỗi đồng bộ dữ liệu');
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const copySQL = () => {
     const sqlText = `-- OFFICE AI HUB - SUPABASE POSTGRESQL SCHEMA
@@ -70,6 +154,7 @@ CREATE TABLE exam_attempts (
 );`;
     navigator.clipboard.writeText(sqlText);
     setCopied(true);
+    toast.info('Đã sao chép mã SQL vào khay nhớ tạm');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -124,15 +209,15 @@ CREATE TABLE exam_attempts (
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center font-bold">
               <Database className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Kiến trúc Cơ sở dữ liệu Supabase & Wireframe
+                Trung tâm Cấu hình & Cơ sở dữ liệu Supabase
               </h2>
               <p className="text-xs text-slate-500">
-                Sơ đồ thực thể quan hệ (ERD), Cấu trúc bảng PostgreSQL & Khung Wireframe Dashboard
+                Kết nối Cloud Supabase, Kiểm tra Ping, Đồng bộ dữ liệu, Sơ đồ thực thể ERD & Wireframe
               </p>
             </div>
           </div>
@@ -145,10 +230,20 @@ CREATE TABLE exam_attempts (
         </div>
 
         {/* Tab switcher */}
-        <div className="flex items-center gap-2 px-6 pt-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-2 px-6 pt-3 border-b border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-none">
+          <button
+            onClick={() => setActiveTab('connect')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${
+              activeTab === 'connect'
+                ? 'border-emerald-600 text-emerald-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Wifi className="w-4 h-4" /> Kết nối & Đồng bộ Supabase
+          </button>
           <button
             onClick={() => setActiveTab('erd')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'erd'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -158,7 +253,7 @@ CREATE TABLE exam_attempts (
           </button>
           <button
             onClick={() => setActiveTab('wireframe')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'wireframe'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -168,7 +263,7 @@ CREATE TABLE exam_attempts (
           </button>
           <button
             onClick={() => setActiveTab('sql')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'sql'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -180,6 +275,114 @@ CREATE TABLE exam_attempts (
 
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {activeTab === 'connect' && (
+            <div className="space-y-6">
+              {/* Status Box */}
+              <div
+                className={`p-4 rounded-2xl border flex items-start justify-between gap-4 ${
+                  testResult?.connected
+                    ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
+                    : 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {testResult?.connected ? (
+                    <Wifi className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <WifiOff className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  )}
+                  <div>
+                    <h3 className="font-bold text-sm">
+                      {testResult?.connected
+                        ? `Đã kết nối Supabase Cloud (${testResult.latencyMs}ms)`
+                        : 'Chế độ Cục bộ (Local Database) / Đang chờ cấu hình'}
+                    </h3>
+                    <p className="text-xs mt-1 leading-relaxed opacity-90">
+                      {testResult?.message ||
+                        'Dữ liệu hiện được lưu trữ an toàn trong trình duyệt. Khi bạn nhập URL và Key từ bảng điều khiển Supabase, hệ thống sẽ tự động chuyển sang Cloud PostgreSQL.'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleTestConnection(true)}
+                  disabled={testing}
+                  className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white shadow-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shrink-0"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${testing ? 'animate-spin' : ''}`} />
+                  <span>{testing ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}</span>
+                </button>
+              </div>
+
+              {/* Form Input URL and Key */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <Globe className="w-4 h-4 text-emerald-600" />
+                  Thông tin kết nối Supabase Project (lấy từ Supabase Settings &gt; API)
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Supabase Project URL (VITE_SUPABASE_URL):
+                  </label>
+                  <input
+                    type="text"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://your-project-ref.supabase.co"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Supabase Anon Public Key (VITE_SUPABASE_ANON_KEY):
+                  </label>
+                  <input
+                    type="password"
+                    value={key}
+                    onChange={(e) => setKey(e.target.value)}
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-[11px] text-slate-500">
+                    💡 Bạn có thể cấu hình trực tiếp trên Vercel qua phần <strong>Environment Variables</strong>.
+                  </span>
+                  <button
+                    onClick={() => handleTestConnection(true)}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                  >
+                    Lưu & Kiểm tra kết nối
+                  </button>
+                </div>
+              </div>
+
+              {/* Seed Data Button */}
+              <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl flex items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-blue-600" />
+                    Đồng bộ dữ liệu mẫu lên Supabase (1-Click Seed)
+                  </h4>
+                  <p className="text-[11px] text-blue-700 dark:text-blue-300 mt-0.5">
+                    Tự động đẩy 4 phòng ban, 10 nhân viên (Admin Nguyễn Hoàng Lâm), 20 câu hỏi khảo thí và 3 đề thi mẫu vào bảng Supabase của bạn.
+                  </p>
+                </div>
+                <button
+                  onClick={handleSyncData}
+                  disabled={syncing || !testResult?.connected}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 shrink-0"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                  <span>{syncing ? 'Đang đồng bộ...' : 'Đẩy dữ liệu mẫu lên Supabase'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'erd' && (
             <div className="space-y-6">
               <div className="p-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl flex items-start gap-3">
@@ -241,11 +444,10 @@ CREATE TABLE exam_attempts (
               {/* Wireframe Diagram Box */}
               <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-slate-50 dark:bg-slate-900/50 font-mono text-xs">
                 <div className="border border-slate-400 rounded-lg p-3 mb-4 bg-white dark:bg-slate-800 flex justify-between items-center">
-                  <span>[HEADER] Logo Office AI Hub | 🔍 Tìm kiếm công cụ, tài liệu... | 🔔 Thông báo | 👤 Nguyễn Hoàng Lâm (Admin)</span>
+                  <span>[HEADER] Logo Office AI Hub | 🔍 Tìm kiếm công cụ, tài liệu... | 🟢 Supabase: Kết nối | 🔔 | 👤 Nguyễn Hoàng Lâm (Admin)</span>
                 </div>
 
                 <div className="grid grid-cols-12 gap-4">
-                  {/* Sidebar mockup */}
                   <div className="col-span-3 border border-slate-400 rounded-lg p-3 bg-white dark:bg-slate-800 space-y-2">
                     <div className="font-bold text-blue-600">SIDEBAR (Vai trò: Admin)</div>
                     <div>• 🏠 Trang chủ / Dashboard</div>
@@ -268,15 +470,12 @@ CREATE TABLE exam_attempts (
                     <div>• 📜 Nhật ký hoạt động</div>
                   </div>
 
-                  {/* Main content mockup */}
                   <div className="col-span-9 space-y-4">
-                    {/* Welcome banner */}
                     <div className="border border-blue-400 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg p-4">
                       <div className="font-bold text-sm text-blue-600">👋 Chào mừng đến với Office AI Hub!</div>
                       <div className="text-xs text-slate-500">Mọi công cụ văn phòng và đào tạo trong một nền tảng.</div>
                     </div>
 
-                    {/* Quick cards */}
                     <div className="grid grid-cols-4 gap-2">
                       <div className="border border-slate-300 rounded p-2 text-center bg-white dark:bg-slate-800">📊 Xử lý Excel</div>
                       <div className="border border-slate-300 rounded p-2 text-center bg-white dark:bg-slate-800">📄 Công cụ PDF</div>
@@ -284,7 +483,6 @@ CREATE TABLE exam_attempts (
                       <div className="border border-slate-300 rounded p-2 text-center bg-white dark:bg-slate-800">📽️ Slide PPT</div>
                     </div>
 
-                    {/* Stats metrics */}
                     <div className="grid grid-cols-4 gap-2">
                       <div className="border border-slate-300 rounded p-2 bg-blue-50 dark:bg-slate-800 text-center">
                         <div className="text-[10px] text-slate-500">Tổng nhân viên</div>
@@ -301,24 +499,6 @@ CREATE TABLE exam_attempts (
                       <div className="border border-slate-300 rounded p-2 bg-amber-50 dark:bg-slate-800 text-center">
                         <div className="text-[10px] text-slate-500">Điểm TB</div>
                         <div className="font-bold text-base text-amber-600">78.5 / 100</div>
-                      </div>
-                    </div>
-
-                    {/* Recent tables */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="border border-slate-300 rounded p-3 bg-white dark:bg-slate-800">
-                        <div className="font-bold mb-2">📋 Bài kiểm tra gần đây</div>
-                        <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
-                          <div>• Kiểm tra Excel cơ bản (25p - 70%)</div>
-                          <div>• Bảo mật thông tin nội bộ (20p - 75%)</div>
-                        </div>
-                      </div>
-                      <div className="border border-slate-300 rounded p-3 bg-white dark:bg-slate-800">
-                        <div className="font-bold mb-2">🔔 Thông báo & Hoạt động</div>
-                        <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
-                          <div>• Đã cập nhật ngân hàng 20 câu hỏi mới</div>
-                          <div>• Lê Văn Công đã hoàn thành bài thi Excel (85.7%)</div>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -412,7 +592,10 @@ CREATE TABLE exam_attempts (
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
+        <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+          <div className="text-xs text-slate-500">
+            Trạng thái hiện tại: <strong>{testResult?.connected ? '🟢 Đã kết nối Cloud' : '🟡 Offline Local'}</strong>
+          </div>
           <button
             onClick={onClose}
             className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-xl text-sm font-semibold transition-all shadow-xs"

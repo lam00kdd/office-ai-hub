@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileSpreadsheet,
   FileCode2,
@@ -13,22 +13,41 @@ import {
   Award,
   ArrowRight,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Database,
+  Wifi,
+  WifiOff,
+  Zap
 } from 'lucide-react';
 import { Employee, SystemStats } from '../types';
 import { DatabaseService } from '../services/storage';
+import { getSupabaseCredentials, testSupabaseConnection } from '../services/supabaseClient';
 
 interface DashboardProps {
   currentUser: Employee;
   stats: SystemStats;
   onNavigate: (view: string) => void;
+  onOpenSchema?: () => void;
 }
 
 export const HomeDashboard: React.FC<DashboardProps> = ({
   currentUser,
   stats,
   onNavigate,
+  onOpenSchema,
 }) => {
+  const [supabaseConnected, setSupabaseConnected] = useState<boolean>(false);
+  const [supabaseLatency, setSupabaseLatency] = useState<number | null>(null);
+
+  useEffect(() => {
+    const creds = getSupabaseCredentials();
+    if (creds.url && creds.key) {
+      testSupabaseConnection().then((res) => {
+        setSupabaseConnected(res.connected);
+        setSupabaseLatency(res.latencyMs || null);
+      });
+    }
+  }, []);
   const exams = DatabaseService.getExams().filter(e => e.status === 'published');
   const logs = DatabaseService.getLogs().slice(0, 5);
 
@@ -137,6 +156,62 @@ export const HomeDashboard: React.FC<DashboardProps> = ({
         {/* Subtle decorative background shapes */}
         <div className="absolute -right-8 -bottom-12 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute right-32 -top-12 w-48 h-48 bg-purple-400/20 rounded-full blur-xl pointer-events-none" />
+      </div>
+
+      {/* Supabase Connection Status Card */}
+      <div className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+        supabaseConnected
+          ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60'
+          : 'bg-gradient-to-r from-slate-50 to-amber-50/40 dark:from-slate-900 dark:to-amber-950/20 border-slate-200 dark:border-slate-800'
+      }`}>
+        <div className="flex items-center gap-3.5">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+            supabaseConnected
+              ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-300'
+              : 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-300'
+          }`}>
+            <Database className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-900 dark:text-white">
+                {supabaseConnected ? 'Cơ sở dữ liệu Supabase Cloud (PostgreSQL)' : 'Trạng thái Cơ sở dữ liệu: Chế độ Cục bộ (Local)'}
+              </span>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                supabaseConnected
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/80 dark:text-emerald-200'
+                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/80 dark:text-amber-200'
+              }`}>
+                {supabaseConnected ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Đang hoạt động ({supabaseLatency || 32}ms)
+                  </>
+                ) : (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    Offline / Local Demo
+                  </>
+                )}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              {supabaseConnected
+                ? 'Tất cả dữ liệu nhân viên, đề thi, câu hỏi và điểm số đang được lưu trữ đồng bộ trên Supabase Cloud.'
+                : 'Ứng dụng đang chạy hoàn hảo với dữ liệu cục bộ. Bạn có thể kết nối Supabase Cloud bất cứ lúc nào qua Vercel hoặc nút Cài đặt.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+          <button
+            onClick={onOpenSchema}
+            className="flex-1 md:flex-initial px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs transition-colors flex items-center justify-center gap-1.5"
+          >
+            <Database className="w-3.5 h-3.5 text-blue-600" />
+            <span>{supabaseConnected ? 'Quản lý Supabase & ERD' : 'Cấu hình Supabase & ERD'}</span>
+          </button>
+        </div>
       </div>
 
       {/* 8 Big Tool Cards (matching UI mockup screen 2) */}

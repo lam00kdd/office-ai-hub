@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Search, Volume2, VolumeX, Bell, Database, Shield, ChevronDown, Check, UserCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Volume2, VolumeX, Bell, Database, Shield, ChevronDown, Check, UserCheck, Wifi, WifiOff } from 'lucide-react';
 import { Employee, UserRole } from '../types';
 import { DatabaseService } from '../services/storage';
+import { getSupabaseCredentials, testSupabaseConnection } from '../services/supabaseClient';
 
 interface HeaderProps {
   currentUser: Employee;
@@ -23,6 +24,35 @@ export const Header: React.FC<HeaderProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState<'connected' | 'local' | 'testing'>('local');
+  const [supabaseLatency, setSupabaseLatency] = useState<number | null>(null);
+
+  const checkSupabase = async () => {
+    const creds = getSupabaseCredentials();
+    if (!creds.url || !creds.key) {
+      setSupabaseStatus('local');
+      setSupabaseLatency(null);
+      return;
+    }
+    setSupabaseStatus('testing');
+    try {
+      const res = await testSupabaseConnection();
+      if (res.connected) {
+        setSupabaseStatus('connected');
+        setSupabaseLatency(res.latencyMs || 25);
+      } else {
+        setSupabaseStatus('local');
+      }
+    } catch {
+      setSupabaseStatus('local');
+    }
+  };
+
+  useEffect(() => {
+    checkSupabase();
+    window.addEventListener('oai-supabase-status-change', checkSupabase);
+    return () => window.removeEventListener('oai-supabase-status-change', checkSupabase);
+  }, []);
 
   const employees = DatabaseService.getEmployees();
 
@@ -107,14 +137,51 @@ export const Header: React.FC<HeaderProps> = ({
           {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
         </button>
 
-        {/* Supabase Schema Modal Quick Access */}
+        {/* Supabase Connection Status Pill & Modal Trigger */}
         <button
           onClick={onOpenSchemaModal}
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 text-xs font-semibold hover:bg-emerald-100 transition-colors"
-          title="Xem sơ đồ thực thể ERD & Wireframe"
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-xs ${
+            supabaseStatus === 'connected'
+              ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/90 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
+              : supabaseStatus === 'testing'
+              ? 'border-blue-300 dark:border-blue-800 bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100'
+              : 'border-amber-300 dark:border-amber-800 bg-amber-50/90 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-100'
+          }`}
+          title={
+            supabaseStatus === 'connected'
+              ? `Đã kết nối Supabase Cloud (${supabaseLatency}ms). Bấm để xem ERD hoặc đồng bộ.`
+              : 'Đang dùng CSDL Cục bộ (LocalStorage). Bấm để cấu hình kết nối Supabase Cloud.'
+          }
         >
+          {supabaseStatus === 'connected' ? (
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          ) : supabaseStatus === 'testing' ? (
+            <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+          ) : (
+            <span className="h-2 w-2 rounded-full bg-amber-400"></span>
+          )}
+
           <Database className="w-3.5 h-3.5" />
-          <span>Sơ đồ Supabase</span>
+          <span className="hidden sm:inline font-bold">
+            {supabaseStatus === 'connected'
+              ? 'Supabase: Đã kết nối'
+              : supabaseStatus === 'testing'
+              ? 'Supabase: Đang test...'
+              : 'Supabase: Cục bộ'}
+          </span>
+          {supabaseLatency !== null && supabaseStatus === 'connected' && (
+            <span className="text-[10px] bg-emerald-200/80 dark:bg-emerald-800/80 px-1.5 py-0.2 rounded font-mono font-bold">
+              {supabaseLatency}ms
+            </span>
+          )}
+          {supabaseStatus === 'local' && (
+            <span className="text-[10px] bg-amber-200/80 dark:bg-amber-800/80 px-1.5 py-0.2 rounded font-bold hidden md:inline">
+              Cấu hình
+            </span>
+          )}
         </button>
 
         {/* Notifications */}
