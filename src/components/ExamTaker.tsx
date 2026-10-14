@@ -40,7 +40,7 @@ export const ExamTaker: React.FC<ExamTakerProps> = ({ currentUser, onFinish }) =
 
   // Timer tick
   useEffect(() => {
-    if (!inProgress || secondsRemaining <= 0) return;
+    if (!inProgress) return;
     const interval = setInterval(() => {
       setSecondsRemaining((prev) => {
         if (prev <= 1) {
@@ -52,7 +52,7 @@ export const ExamTaker: React.FC<ExamTakerProps> = ({ currentUser, onFinish }) =
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [inProgress, secondsRemaining]);
+  }, [inProgress]);
 
   const handleStartExam = (exam: Exam) => {
     setSelectedExam(exam);

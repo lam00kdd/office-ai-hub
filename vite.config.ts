@@ -19,21 +19,30 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     build: {
-      chunkSizeWarningLimit: 2500,
+      chunkSizeWarningLimit: 800,
       rollupOptions: {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('xlsx') || id.includes('pdf-lib') || id.includes('pptxgenjs')) {
-                return 'vendor-office';
+              if (id.includes('xlsx')) {
+                return 'vendor-xlsx';
+              }
+              if (id.includes('pdf-lib') || id.includes('fontkit')) {
+                return 'vendor-pdf';
+              }
+              if (id.includes('pptxgenjs')) {
+                return 'vendor-pptx';
               }
               if (id.includes('@supabase')) {
                 return 'vendor-supabase';
               }
-              if (id.includes('react') || id.includes('lucide-react') || id.includes('motion')) {
-                return 'vendor-framework';
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
               }
-              return 'vendor-core';
+              if (id.includes('react-dom') || id.includes('react/') || id.includes('scheduler')) {
+                return 'vendor-react';
+              }
+              return 'vendor-common';
             }
           },
         },

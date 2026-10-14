@@ -1,34 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { HomeDashboard } from './components/HomeDashboard';
-import { ExcelTools } from './components/ExcelTools';
-import { PdfTools } from './components/PdfTools';
-import { WordTools } from './components/WordTools';
-import { PowerPointTools } from './components/PowerPointTools';
-import { FileConverter } from './components/FileConverter';
-import { AIChat } from './components/AIChat';
-import { AIOfficeTools } from './components/AIOfficeTools';
-import { ExamTaker } from './components/ExamTaker';
-import { ExamBuilder } from './components/ExamBuilder';
-import { QuestionBank } from './components/QuestionBank';
-import { ExamList } from './components/ExamList';
-import { ResultsAndReports } from './components/ResultsAndReports';
-import { StaffManagement } from './components/StaffManagement';
-import { ActivityLogs } from './components/ActivityLogs';
 import { DatabaseSchemaModal } from './components/DatabaseSchemaModal';
 import { ExcelUserFlowModal } from './components/ExcelUserFlowModal';
 import { LoginModal } from './components/LoginModal';
 import { PermissionMatrixModal } from './components/PermissionMatrixModal';
 import { InternalAccessGuard } from './components/InternalAccessGuard';
 import { ToastContainer } from './components/ToastContainer';
-import { ManufacturingHub } from './components/ManufacturingHub';
-import { IsoIatfDocManager } from './components/IsoIatfDocManager';
-import { MealAndAttendance } from './components/MealAndAttendance';
-import { WireHarnessTools } from './components/WireHarnessTools';
 import { DatabaseService } from './services/storage';
 import { toast } from './services/toast';
 import { Employee, SystemStats } from './types';
+
+// Lazy-loaded submodules to split chunks and speed up initial page load
+const ExcelTools = lazy(() => import('./components/ExcelTools').then(m => ({ default: m.ExcelTools })));
+const PdfTools = lazy(() => import('./components/PdfTools').then(m => ({ default: m.PdfTools })));
+const WordTools = lazy(() => import('./components/WordTools').then(m => ({ default: m.WordTools })));
+const PowerPointTools = lazy(() => import('./components/PowerPointTools').then(m => ({ default: m.PowerPointTools })));
+const FileConverter = lazy(() => import('./components/FileConverter').then(m => ({ default: m.FileConverter })));
+const AIChat = lazy(() => import('./components/AIChat').then(m => ({ default: m.AIChat })));
+const AIOfficeTools = lazy(() => import('./components/AIOfficeTools').then(m => ({ default: m.AIOfficeTools })));
+const ExamTaker = lazy(() => import('./components/ExamTaker').then(m => ({ default: m.ExamTaker })));
+const ExamBuilder = lazy(() => import('./components/ExamBuilder').then(m => ({ default: m.ExamBuilder })));
+const QuestionBank = lazy(() => import('./components/QuestionBank').then(m => ({ default: m.QuestionBank })));
+const ExamList = lazy(() => import('./components/ExamList').then(m => ({ default: m.ExamList })));
+const ResultsAndReports = lazy(() => import('./components/ResultsAndReports').then(m => ({ default: m.ResultsAndReports })));
+const StaffManagement = lazy(() => import('./components/StaffManagement').then(m => ({ default: m.StaffManagement })));
+const ActivityLogs = lazy(() => import('./components/ActivityLogs').then(m => ({ default: m.ActivityLogs })));
+const ManufacturingHub = lazy(() => import('./components/ManufacturingHub').then(m => ({ default: m.ManufacturingHub })));
+const IsoIatfDocManager = lazy(() => import('./components/IsoIatfDocManager').then(m => ({ default: m.IsoIatfDocManager })));
+const MealAndAttendance = lazy(() => import('./components/MealAndAttendance').then(m => ({ default: m.MealAndAttendance })));
+const WireHarnessTools = lazy(() => import('./components/WireHarnessTools').then(m => ({ default: m.WireHarnessTools })));
 
 export default function App() {
   const [currentView, setCurrentView] = useState<string>('dashboard');
@@ -258,7 +260,16 @@ export default function App() {
             </div>
           </div>
 
-          {renderContent()}
+          <Suspense
+            fallback={
+              <div className="flex flex-col items-center justify-center min-h-[380px] space-y-3">
+                <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-slate-500 font-medium">Đang tải phân hệ...</span>
+              </div>
+            }
+          >
+            {renderContent()}
+          </Suspense>
         </main>
       </div>
 
