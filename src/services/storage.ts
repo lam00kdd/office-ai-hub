@@ -28,6 +28,7 @@ const STORAGE_KEYS = {
   ATTEMPTS: 'oai_attempts',
   LOGS: 'oai_logs',
   CURRENT_USER: 'oai_current_user',
+  AUTH_STATE: 'oai_is_authenticated',
   SUPABASE_CONFIG: 'oai_supabase_config',
   SOUND_ENABLED: 'oai_sound_enabled',
 };
@@ -83,10 +84,11 @@ function initializeData() {
   if (currentUserRaw) {
     try {
       const cur: Employee = JSON.parse(currentUserRaw);
-      if (cur.role === 'admin' || cur.employee_code === 'NV001') {
+      if (cur.role === 'admin' || cur.employee_code === 'NV001' || cur.employee_code === 'LAMNH') {
         cur.full_name = 'Nguyễn Hoàng Lâm';
         cur.email = 'nh.lam19382@gmail.com';
         cur.position = 'Tổng Quản trị viên (Admin)';
+        cur.password = cur.password || 'admin123';
         if (!cur.avatar_url || cur.avatar_url.includes('unsplash')) {
           cur.avatar_url = '/admin-avatar.svg';
         }
@@ -102,6 +104,135 @@ initializeData();
 
 export const DatabaseService = {
   // Current user & authentication
+  isAuthenticated(): boolean {
+    const raw = localStorage.getItem(STORAGE_KEYS.AUTH_STATE);
+    return raw !== 'false'; // Default to true on initial session
+  },
+
+  isGuestUser(): boolean {
+    const user = this.getCurrentUser();
+    return user.role === 'guest' || !!user.is_guest;
+  },
+
+  login(user: Employee, remember = true) {
+    localStorage.setItem(STORAGE_KEYS.AUTH_STATE, 'true');
+    this.setCurrentUser(user);
+    const providerLabel = user.role === 'guest' ? 'Khách (Công cụ công khai)' : `Nhân viên nội bộ (${user.role.toUpperCase()})`;
+    this.addLog(user.full_name, 'Đăng nhập', 'Bảo mật', `Đăng nhập thành công với chế độ: ${providerLabel}`);
+    this.playSuccessSound();
+    notifyChange(STORAGE_KEYS.AUTH_STATE);
+  },
+
+  // Phương án 2: Xác thực Nhân viên Nội bộ (Mã NV + Mật khẩu nội bộ)
+  verifyEmployeeLogin(codeOrEmail: string, passwordInput: string): {
+    success: boolean;
+    employee?: Employee;
+    message: string;
+  } {
+    const employees = this.getEmployees();
+    const cleanCode = codeOrEmail.trim().toLowerCase();
+    const cleanPass = passwordInput.trim();
+
+    if (!cleanCode || !cleanPass) {
+      return { success: false, message: 'Vui lòng nhập đầy đủ Mã Nhân viên và Mật khẩu.' };
+    }
+
+    // Match by employee_code (or alias LAMNH for admin) or email
+    const emp = employees.find((e) => {
+      const eCode = (e.employee_code || '').toLowerCase();
+      const eEmail = (e.email || '').toLowerCase();
+      if (cleanCode === 'lamnh' && (eCode === 'nv001' || e.role === 'admin')) return true;
+      return eCode === cleanCode || eEmail === cleanCode;
+    });
+
+    if (!emp) {
+      return {
+        success: false,
+        message: `Không tìm thấy nhân viên với mã hoặc email "${codeOrEmail}". Vui lòng kiểm tra lại.`,
+      };
+    }
+
+    if (emp.status === 'inactive') {
+      return {
+        success: false,
+        message: 'Tài khoản nhân viên này đang trong trạng thái tạm khóa. Vui lòng liên hệ Admin.',
+      };
+    }
+
+    // Expected password (default: admin123 for admin, 123456 for staff)
+    const expectedPass = emp.password || (emp.role === 'admin' ? 'admin123' : '123456');
+
+    if (cleanPass !== expectedPass) {
+      return {
+        success: false,
+        message: 'Mật khẩu nội bộ không chính xác. Vui lòng thử lại hoặc liên hệ Admin.',
+      };
+    }
+
+    return {
+      success: true,
+      employee: emp,
+      message: `Xác thực thành công cán bộ nhân viên: ${emp.full_name} (${emp.position}).`,
+    };
+  },
+
+  // Phương án 1: Đăng nhập Khách (Supabase Auth chuẩn hoặc Khách vãng lai)
+  loginAsGuest(guestInfo?: { email?: string; name?: string; provider?: 'supabase_auth' | 'guest' }): Employee {
+    const guestUser: Employee = {
+      id: `guest-${Date.now()}`,
+      employee_code: 'GUEST',
+      full_name: guestInfo?.name || (guestInfo?.email ? guestInfo.email.split('@')[0] : 'Khách vãng lai (Guest User)'),
+      email: guestInfo?.email || 'guest@officeai.local',
+      position: 'Khách trải nghiệm công cụ Office & AI',
+      department_id: 'dept-guest',
+      department_name: 'Khách / Đối tác công cộng',
+      role: 'guest',
+      status: 'active',
+      is_guest: true,
+      auth_provider: guestInfo?.provider || (guestInfo?.email ? 'supabase_auth' : 'guest'),
+      avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
+      created_at: new Date().toISOString(),
+    };
+
+    this.login(guestUser);
+    return guestUser;
+  },
+
+  changePassword(employeeId: string, oldPass: string, newPass: string): { success: boolean; message: string } {
+    const employees = this.getEmployees();
+    const idx = employees.findIndex((e) => e.id === employeeId);
+    if (idx < 0) return { success: false, message: 'Không tìm thấy nhân viên.' };
+
+    const emp = employees[idx];
+    const expectedPass = emp.password || (emp.role === 'admin' ? 'admin123' : '123456');
+    if (oldPass !== expectedPass) {
+      return { success: false, message: 'Mật khẩu cũ không chính xác.' };
+    }
+    if (newPass.length < 6) {
+      return { success: false, message: 'Mật khẩu mới phải có ít nhất 6 ký tự.' };
+    }
+
+    employees[idx].password = newPass;
+    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+
+    const cur = this.getCurrentUser();
+    if (cur.id === employeeId) {
+      cur.password = newPass;
+      this.setCurrentUser(cur);
+    }
+
+    this.addLog(emp.full_name, 'Đổi mật khẩu', 'Bảo mật', 'Thay đổi mật khẩu tài khoản thành công');
+    notifyChange(STORAGE_KEYS.EMPLOYEES);
+    return { success: true, message: 'Đổi mật khẩu thành công!' };
+  },
+
+  logout() {
+    const user = this.getCurrentUser();
+    localStorage.setItem(STORAGE_KEYS.AUTH_STATE, 'false');
+    this.addLog(user.full_name, 'Đăng xuất', 'Bảo mật', 'Người dùng đã đăng xuất khỏi phiên làm việc');
+    notifyChange(STORAGE_KEYS.AUTH_STATE);
+  },
+
   getCurrentUser(): Employee {
     const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (!raw) return INITIAL_EMPLOYEES[0];
@@ -118,13 +249,18 @@ export const DatabaseService = {
   },
 
   switchRole(role: UserRole) {
+    if (role === 'guest') {
+      this.loginAsGuest();
+      return;
+    }
     const current = this.getCurrentUser();
     const target = this.getEmployees().find(e => e.role === role) || {
       ...current,
       role,
+      is_guest: false,
     };
     this.setCurrentUser(target);
-    this.addLog(target.full_name, 'Chuyển vai trò', 'Phân quyền', `Đổi vai trò sang ${role}`);
+    this.addLog(target.full_name, 'Chuyển vai trò', 'Phân quyền', `Đổi vai trò sang ${role.toUpperCase()}`);
   },
 
   updateUserAvatar(avatarUrl: string) {

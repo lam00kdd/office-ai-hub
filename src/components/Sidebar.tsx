@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   LayoutDashboard,
   FileSpreadsheet,
@@ -18,7 +17,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Send,
-  BookOpenCheck
+  BookOpenCheck,
+  Lock
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -39,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   onOpenSchemaModal,
 }) => {
+  const isGuest = userRole === 'guest';
   const isAdmin = userRole === 'admin';
   const isManager = userRole === 'manager' || isAdmin;
 
@@ -136,16 +137,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <NavItem view="ai-chat" icon={Bot} label="Chat với AI (Gemini)" badge="AI" />
         <NavItem view="ai-tools" icon={Sparkles} label="12 Công cụ AI văn phòng" />
 
-        <SectionHeader label="Đào tạo & Kiểm tra" />
-        <NavItem view="exam-take" icon={BookOpenCheck} label="Làm bài kiểm tra" badge="Thi" />
-        {isManager && (
+        <SectionHeader label={isGuest ? "Đào tạo [Nội bộ công ty 🔒]" : "Đào tạo & Kiểm tra"} />
+        {isGuest ? (
           <>
-            <NavItem view="exam-builder" icon={PlusCircle} label="Tạo bài kiểm tra" />
-            <NavItem view="question-bank" icon={HelpCircle} label="Ngân hàng câu hỏi" />
-            <NavItem view="exam-list" icon={Send} label="Danh sách & Giao bài" />
+            <NavItem view="exam-take" icon={Lock} label="Làm bài thi (Nội bộ)" badge="Khóa 🔒" />
+            <NavItem view="results" icon={Lock} label="Kết quả thi (Nội bộ)" badge="Khóa 🔒" />
+          </>
+        ) : (
+          <>
+            <NavItem view="exam-take" icon={BookOpenCheck} label="Làm bài kiểm tra" badge="Thi" />
+            {isManager && (
+              <>
+                <NavItem view="exam-builder" icon={PlusCircle} label="Tạo bài kiểm tra" />
+                <NavItem view="question-bank" icon={HelpCircle} label="Ngân hàng câu hỏi" />
+                <NavItem view="exam-list" icon={Send} label="Danh sách & Giao bài" />
+              </>
+            )}
+            <NavItem view="results" icon={BarChart3} label="Kết quả & Báo cáo" />
           </>
         )}
-        <NavItem view="results" icon={BarChart3} label="Kết quả & Báo cáo" />
 
         {isAdmin && (
           <>

@@ -122,35 +122,60 @@ export const HomeDashboard: React.FC<DashboardProps> = ({
     },
   ];
 
+  const isGuest = currentUser.role === 'guest';
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-in fade-in duration-200">
       {/* Welcome Hero Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 text-white p-6 md:p-8 shadow-lg shadow-blue-500/15">
         <div className="relative z-10 max-w-2xl">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-sm mb-3">
-            ✨ Phiên bản Office AI Hub 2026
+            {isGuest ? '🌐 Chế độ Khách (Supabase Auth)' : '✨ Cán bộ Nhân viên Nội bộ'} • Office AI Hub 2026
           </span>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-            Chào mừng đến với Office AI Hub!
+            {isGuest ? 'Chào mừng bạn đến với Office AI Hub!' : `Xin chào, ${currentUser.full_name}!`}
           </h1>
           <p className="mt-2 text-sm md:text-base text-blue-100 font-normal leading-relaxed">
-            Mọi công cụ văn phòng và đào tạo trong một nền tảng: Xử lý tệp tin, trợ lý AI đa năng và hệ thống khảo thí
-            đánh giá năng lực nhân sự toàn diện.
+            {isGuest
+              ? 'Bạn đang truy cập với tư cách Khách. Bạn có thể sử dụng miễn phí toàn bộ bộ công cụ văn phòng (Excel, PDF, Word, PowerPoint, Converter) và Trợ lý AI Gemini. Các tính năng khảo thí nội bộ được bảo vệ an toàn.'
+              : 'Mọi công cụ văn phòng và đào tạo trong một nền tảng: Xử lý tệp tin, trợ lý AI đa năng và hệ thống khảo thí đánh giá năng lực nhân sự toàn diện.'}
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => onNavigate('exam-take')}
-              className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-xs md:text-sm font-bold shadow-md transition-all flex items-center gap-2"
-            >
-              <span>Vào thi ngay</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onNavigate('excel')}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs md:text-sm font-semibold backdrop-blur-sm transition-all"
-            >
-              Mở công cụ Excel
-            </button>
+            {isGuest ? (
+              <>
+                <button
+                  onClick={() => onNavigate('excel')}
+                  className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-xs md:text-sm font-bold shadow-md transition-all flex items-center gap-2"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  <span>Trải nghiệm Công cụ Excel</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onNavigate('ai-chat')}
+                  className="px-4 py-2 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs md:text-sm font-semibold backdrop-blur-sm transition-all flex items-center gap-2"
+                >
+                  <Bot className="w-4 h-4 text-purple-300" />
+                  <span>Chat Trợ lý AI</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => onNavigate('exam-take')}
+                  className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-xs md:text-sm font-bold shadow-md transition-all flex items-center gap-2"
+                >
+                  <span>Vào phòng thi ngay</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onNavigate('excel')}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs md:text-sm font-semibold backdrop-blur-sm transition-all"
+                >
+                  Mở công cụ Excel
+                </button>
+              </>
+            )}
           </div>
         </div>
         {/* Subtle decorative background shapes */}

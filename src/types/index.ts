@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'manager' | 'employee';
+export type UserRole = 'admin' | 'manager' | 'employee' | 'guest';
 
 export interface Department {
   id: string;
@@ -22,6 +22,9 @@ export interface Employee {
   role: UserRole;
   status: 'active' | 'inactive' | 'on_leave';
   avatar_url?: string;
+  password?: string;
+  is_guest?: boolean;
+  auth_provider?: 'internal' | 'supabase_auth' | 'guest';
   created_at: string;
 }
 
