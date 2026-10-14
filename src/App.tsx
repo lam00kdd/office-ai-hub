@@ -22,6 +22,10 @@ import { LoginModal } from './components/LoginModal';
 import { PermissionMatrixModal } from './components/PermissionMatrixModal';
 import { InternalAccessGuard } from './components/InternalAccessGuard';
 import { ToastContainer } from './components/ToastContainer';
+import { ManufacturingHub } from './components/ManufacturingHub';
+import { IsoIatfDocManager } from './components/IsoIatfDocManager';
+import { MealAndAttendance } from './components/MealAndAttendance';
+import { WireHarnessTools } from './components/WireHarnessTools';
 import { DatabaseService } from './services/storage';
 import { toast } from './services/toast';
 import { Employee, SystemStats } from './types';
@@ -71,8 +75,16 @@ export default function App() {
         return 'Quản trị Nhân sự & Phòng ban';
       case 'logs':
         return 'Nhật ký an ninh & Hoạt động hệ thống';
+      case 'manufacturing':
+        return 'Quản lý Sản xuất, Kho vận & Chất lượng (IQC/OQC)';
+      case 'wire-harness':
+        return 'Công cụ Kỹ thuật Bộ dây & Dập cos';
+      case 'iso-docs':
+        return 'Quy trình Tài liệu chuẩn ISO / IATF 16949';
+      case 'meal-attendance':
+        return 'Báo cơm nhà ăn & Chấm công OT';
       default:
-        return 'Tính năng nội bộ';
+        return 'Tính năng hệ thống';
     }
   };
 
@@ -86,6 +98,9 @@ export default function App() {
       'results',
       'staff',
       'logs',
+      'manufacturing',
+      'iso-docs',
+      'meal-attendance',
     ];
 
     if (currentUser.role === 'guest' && internalViews.includes(currentView)) {
@@ -93,7 +108,7 @@ export default function App() {
         <InternalAccessGuard
           moduleName={getModuleName(currentView)}
           onOpenEmployeeLogin={() => setIsLoginModalOpen(true)}
-          onNavigateToTools={() => setCurrentView('excel')}
+          onNavigateToTools={() => setCurrentView('wire-harness')}
         />
       );
     }
@@ -143,6 +158,14 @@ export default function App() {
         return <AIChat />;
       case 'ai-tools':
         return <AIOfficeTools />;
+      case 'manufacturing':
+        return <ManufacturingHub />;
+      case 'wire-harness':
+        return <WireHarnessTools />;
+      case 'iso-docs':
+        return <IsoIatfDocManager />;
+      case 'meal-attendance':
+        return <MealAndAttendance />;
       case 'exam-take':
         return <ExamTaker currentUser={currentUser} onFinish={() => setCurrentView('results')} />;
       case 'exam-builder':

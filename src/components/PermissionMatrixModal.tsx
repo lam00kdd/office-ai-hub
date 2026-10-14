@@ -143,7 +143,7 @@ export const PermissionMatrixModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
             <ul className="list-disc list-inside space-y-1 text-slate-700 dark:text-slate-300 pl-1">
               <li>
-                <strong>Phương án 1 (Supabase Auth chuẩn cho Khách):</strong> Người dùng ngoài doanh nghiệp hoặc khách đối tác đăng nhập Email qua Supabase Auth để sử dụng tự do toàn bộ công cụ Office và Trợ lý AI. Tuyệt đối không thể truy cập đề thi hoặc dữ liệu nội bộ.
+                <strong>Phương án 1 (Supabase Auth & Google OAuth cho Khách):</strong> Người dùng ngoài doanh nghiệp hoặc khách đối tác đăng nhập nhanh qua Google hoặc Email Supabase Auth để sử dụng tự do toàn bộ công cụ Office và Trợ lý AI. Thông tin khách được lưu tự động vào Database. Tuyệt đối không thể truy cập đề thi hoặc dữ liệu nội bộ.
               </li>
               <li>
                 <strong>Phương án 2 (Mã NV + Mật khẩu nội bộ):</strong> Dành riêng cho Cán bộ Nhân viên công ty. Xác thực nghiêm ngặt theo Mã NV và Mật khẩu nội bộ, phân quyền theo 3 cấp độ: <strong>Admin</strong> (Nguyễn Hoàng Lâm), <strong>Trưởng phòng (Manager)</strong> và <strong>Nhân viên (Employee)</strong>.

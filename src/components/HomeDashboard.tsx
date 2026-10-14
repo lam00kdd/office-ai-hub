@@ -17,7 +17,11 @@ import {
   Database,
   Wifi,
   WifiOff,
-  Zap
+  Zap,
+  Factory,
+  FileCheck,
+  Utensils,
+  Boxes
 } from 'lucide-react';
 import { Employee, SystemStats } from '../types';
 import { DatabaseService } from '../services/storage';
@@ -279,6 +283,132 @@ export const HomeDashboard: React.FC<DashboardProps> = ({
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Phân xưởng Sản xuất, Tiêu chuẩn IATF & Đời sống Công nhân */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300 text-[11px] font-bold uppercase tracking-wider mb-1">
+              <Factory className="w-3.5 h-3.5" />
+              Sản xuất & Đời sống Nhà xưởng
+            </div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              Phân xưởng Lắp ráp Dây & Tiêu chuẩn IATF 16949
+            </h2>
+          </div>
+          <span className="text-xs text-slate-500 hidden sm:inline">Phù hợp nhà máy lắp ráp linh kiện điện tử</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Manufacturing QA/QC */}
+          <div
+            onClick={() => onNavigate('manufacturing')}
+            className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center">
+                  <Factory className="w-5 h-5" />
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 uppercase">
+                  QA/QC & Kho
+                </span>
+              </div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
+                Sản xuất, Kho & QC
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                Kiểm định 3 cấp IQC (Nguyên liệu) - IPQC (Dập cos/ráp) - OQC (Xuất kho) và giám sát Andon.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs font-semibold text-blue-600">
+              <span>Mở quản lý QC</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* Card 2: Wire Harness Engineering */}
+          <div
+            onClick={() => onNavigate('wire-harness')}
+            className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-amber-500 dark:hover:border-amber-500 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 uppercase">
+                  Kỹ thuật
+                </span>
+              </div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors">
+                Kỹ thuật Dây & Dập Cos
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                Máy tính đo Crimp Height & lực kéo N, tra cứu bảng mã màu dây xe hơi, bảng quy đổi AWG.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs font-semibold text-amber-600">
+              <span>Tra thông số cos</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* Card 3: ISO / IATF 16949 */}
+          <div
+            onClick={() => onNavigate('iso-docs')}
+            className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-500 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 flex items-center justify-center">
+                  <FileCheck className="w-5 h-5" />
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 uppercase">
+                  QMS IATF
+                </span>
+              </div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-purple-600 transition-colors">
+                Quy trình ISO / IATF
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                Biên soạn - Soát xét - Ký duyệt và đóng dấu đỏ Controlled Copy cho SOP, WI, Control Plan.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs font-semibold text-purple-600">
+              <span>Quy trình tài liệu</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* Card 4: Meal & Attendance */}
+          <div
+            onClick={() => onNavigate('meal-attendance')}
+            className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center">
+                  <Utensils className="w-5 h-5" />
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 uppercase">
+                  Hành chính
+                </span>
+              </div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-emerald-600 transition-colors">
+                Báo cơm & Chấm công OT
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                Đăng ký cơm ca mặn/chay cho ca 1, 2, 3, ăn nhẹ tăng ca và điểm danh, duyệt giờ làm thêm OT.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs font-semibold text-emerald-600">
+              <span>Báo cơm & Điểm danh</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
         </div>
       </div>
 

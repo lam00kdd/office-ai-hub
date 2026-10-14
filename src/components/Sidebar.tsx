@@ -18,7 +18,12 @@ import {
   ChevronRight,
   Send,
   BookOpenCheck,
-  Lock
+  Lock,
+  Factory,
+  Zap,
+  FileCheck,
+  Utensils,
+  Boxes
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -136,6 +141,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <SectionHeader label="Trợ lý AI" />
         <NavItem view="ai-chat" icon={Bot} label="Chat với AI (Gemini)" badge="AI" />
         <NavItem view="ai-tools" icon={Sparkles} label="12 Công cụ AI văn phòng" />
+
+        <SectionHeader label="Sản xuất & Dây dẫn điện" />
+        <NavItem view="manufacturing" icon={Factory} label="Sản xuất, Kho & QA/QC" badge="IATF" />
+        <NavItem view="wire-harness" icon={Zap} label="Kỹ thuật Dây & Dập Cos" />
+        <NavItem view="iso-docs" icon={FileCheck} label="Quy trình ISO / IATF" badge="QMS" />
+        <NavItem view="meal-attendance" icon={Utensils} label="Báo cơm & Chấm công OT" />
 
         <SectionHeader label={isGuest ? "Đào tạo [Nội bộ công ty 🔒]" : "Đào tạo & Kiểm tra"} />
         {isGuest ? (
