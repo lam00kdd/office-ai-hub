@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="goldRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="50%" stop-color="#FCD34D" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+    <clipPath id="avatarClip">
+      <circle cx="100" cy="100" r="86" />
+    </clipPath>
+  </defs>
+
+  <!-- Outer Golden Frame Ring matching Zalo frame -->
+  <circle cx="100" cy="100" r="96" fill="url(#goldRing)" />
+  <circle cx="100" cy="100" r="88" fill="#FFFFFF" />
+
+  <!-- Clipped Avatar Content -->
+  <g clip-path="url(#avatarClip)">
+    <!-- Garden Floral Background -->
+    <rect x="0" y="0" width="200" height="200" fill="#E0F2FE" />
+    <circle cx="50" cy="40" r="30" fill="#F472B6" opacity="0.3" />
+    <circle cx="150" cy="50" r="35" fill="#FB7185" opacity="0.3" />
+    <circle cx="90" cy="30" r="25" fill="#34D399" opacity="0.2" />
+
+    <!-- Wooden fence silhouette in background -->
+    <rect x="25" y="60" width="10" height="80" fill="#94A3B8" opacity="0.4" />
+    <rect x="45" y="55" width="10" height="85" fill="#94A3B8" opacity="0.4" />
+    <rect x="145" y="55" width="10" height="85" fill="#94A3B8" opacity="0.4" />
+    <rect x="165" y="60" width="10" height="80" fill="#94A3B8" opacity="0.4" />
+
+    <!-- Body & White Shirt + Black Blazer Suit -->
+    <path d="M40 210 L160 210 L160 165 C160 140 140 135 100 135 C60 135 40 140 40 165 Z" fill="#1E293B" />
+    <!-- White shirt collar -->
+    <polygon points="100,165 78,140 122,140" fill="#FFFFFF" />
+    <polygon points="100,178 92,148 108,148" fill="#F1F5F9" />
+
+    <!-- Neck -->
+    <rect x="88" y="120" width="24" height="25" fill="#FBCFE8" opacity="0.2" />
+    <rect x="88" y="115" width="24" height="25" fill="#FCD34D" opacity="0.4" />
+    <path d="M88 118 Q100 132 112 118 L112 135 Q100 142 88 135 Z" fill="#E2A76F" />
+
+    <!-- Face Oval -->
+    <ellipse cx="100" cy="88" rx="42" ry="48" fill="#F5C396" />
+
+    <!-- Ears -->
+    <ellipse cx="58" cy="90" rx="8" ry="14" fill="#ECAE7E" />
+    <ellipse cx="142" cy="90" rx="8" ry="14" fill="#ECAE7E" />
+
+    <!-- Cheerful Eyes & Eyebrows -->
+    <ellipse cx="82" cy="80" rx="6" ry="4" fill="#1E293B" />
+    <circle cx="84" cy="79" r="1.5" fill="#FFFFFF" />
+    <ellipse cx="118" cy="80" rx="6" ry="4" fill="#1E293B" />
+    <circle cx="120" cy="79" r="1.5" fill="#FFFFFF" />
+
+    <!-- Eyebrows -->
+    <path d="M72 72 Q82 68 92 73" stroke="#0F172A" stroke-width="3" fill="none" stroke-linecap="round" />
+    <path d="M108 73 Q118 68 128 72" stroke="#0F172A" stroke-width="3" fill="none" stroke-linecap="round" />
+
+    <!-- Nose -->
+    <path d="M98 83 Q100 95 104 96" stroke="#D99B6A" stroke-width="2" fill="none" stroke-linecap="round" />
+
+    <!-- Warm Smile with Teeth -->
+    <path d="M84 102 Q100 120 116 102 Z" fill="#991B1B" />
+    <path d="M87 103 Q100 110 113 103 Z" fill="#FFFFFF" />
+
+    <!-- Hair (short dark cropped corporate style) -->
+    <path d="M58 80 C56 50 75 36 100 36 C125 36 144 50 142 80 C138 62 125 50 100 52 C75 50 62 62 58 80 Z" fill="#0F172A" />
+    <path d="M70 50 Q100 42 130 52 Q115 42 100 42 Q85 42 70 50 Z" fill="#1E293B" />
+
+    <!-- Cute Dog Badge at bottom matching user's Zalo sticker -->
+    <g transform="translate(68, 138) scale(0.65)">
+      <!-- Dog Head -->
+      <ellipse cx="50" cy="45" rx="36" ry="30" fill="#E08B38" />
+      <ellipse cx="50" cy="54" rx="26" ry="20" fill="#FFFFFF" />
+      <!-- Dog Ears -->
+      <polygon points="18,30 28,10 38,28" fill="#B45309" />
+      <polygon points="82,30 72,10 62,28" fill="#B45309" />
+      <!-- Dog Eyes & Cute Snout -->
+      <circle cx="40" cy="42" r="4" fill="#1E293B" />
+      <circle cx="60" cy="42" r="4" fill="#1E293B" />
+      <ellipse cx="50" cy="50" rx="5" ry="3" fill="#1E293B" />
+      <!-- Cheeks -->
+      <circle cx="30" cy="50" r="4" fill="#FDA4AF" />
+      <circle cx="70" cy="50" r="4" fill="#FDA4AF" />
+    </g>
+  </g>
+
+  <!-- Gold Badge Text at top "Zalo / Admin" -->
+  <rect x="75" y="8" width="50" height="18" rx="9" fill="#F59E0B" />
+  <text x="100" y="21" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#FFFFFF" text-anchor="middle">ADMIN</text>
+</svg>

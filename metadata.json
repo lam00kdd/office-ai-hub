@@ -1,0 +1,8 @@
+{
+  "name": "Office AI Hub",
+  "description": "Trợ lý văn phòng & Quản lý đào tạo thông minh: Xử lý Excel, PDF, Word, PowerPoint, Trợ lý AI Gemini và Hệ thống khảo thí nhân viên trực tuyến.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
