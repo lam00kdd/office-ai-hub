@@ -22,31 +22,49 @@ export function getSupabaseCredentials(): { url: string; key: string } {
   const localUrl = localStorage.getItem(STORAGE_KEYS.SUPABASE_URL) || '';
   const localKey = localStorage.getItem(STORAGE_KEYS.SUPABASE_KEY) || '';
 
+  const cleanUrl = (localUrl || envUrl || '').trim().replace(/\/+$/, '');
+  const cleanKey = (localKey || envKey || '').trim().replace(/^['"]|['"]$/g, '');
+
   return {
-    url: localUrl || envUrl || '',
-    key: localKey || envKey || '',
+    url: cleanUrl,
+    key: cleanKey,
   };
 }
 
 export function saveSupabaseCredentials(url: string, key: string) {
-  if (url) localStorage.setItem(STORAGE_KEYS.SUPABASE_URL, url.trim());
+  const cleanUrl = url ? url.trim().replace(/\/+$/, '') : '';
+  const cleanKey = key ? key.trim().replace(/^['"]|['"]$/g, '') : '';
+
+  if (cleanUrl) localStorage.setItem(STORAGE_KEYS.SUPABASE_URL, cleanUrl);
   else localStorage.removeItem(STORAGE_KEYS.SUPABASE_URL);
 
-  if (key) localStorage.setItem(STORAGE_KEYS.SUPABASE_KEY, key.trim());
+  if (cleanKey) localStorage.setItem(STORAGE_KEYS.SUPABASE_KEY, cleanKey);
   else localStorage.removeItem(STORAGE_KEYS.SUPABASE_KEY);
+
+  // Invalidate cached client instance immediately so next call creates fresh client
+  supabaseInstance = null;
+  currentClientUrl = '';
+  currentClientKey = '';
 
   // Notify components about credentials change
   window.dispatchEvent(new CustomEvent('oai-supabase-status-change'));
 }
 
 let supabaseInstance: SupabaseClient | null = null;
+let currentClientUrl = '';
+let currentClientKey = '';
 
 export function getSupabaseClient(): SupabaseClient | null {
   const { url, key } = getSupabaseCredentials();
-  if (!url || !key) return null;
+  if (!url || !key) {
+    supabaseInstance = null;
+    return null;
+  }
 
   try {
-    if (!supabaseInstance) {
+    if (!supabaseInstance || currentClientUrl !== url || currentClientKey !== key) {
+      currentClientUrl = url;
+      currentClientKey = key;
       supabaseInstance = createClient(url, key, {
         auth: { persistSession: true },
       });
@@ -164,6 +182,14 @@ export async function testSupabaseConnection(): Promise<{
     };
   }
 
+  // Khóa Anon Key của Supabase luôn là mã JWT (bắt đầu bằng eyJ và có 3 phần tách nhau bởi dấu chấm, thường > 100 ký tự)
+  if (!key.startsWith('eyJ') && key.length < 90) {
+    return {
+      connected: false,
+      message: `Khóa API không đúng định dạng: Khóa Supabase Anon Public Key luôn bắt đầu bằng "eyJ..." và dài hơn 150 ký tự. Bạn đang nhập chuỗi dài ${key.length} ký tự. Hãy vào Supabase Dashboard > Settings > API > Project API keys > copy khóa "anon public".`,
+    };
+  }
+
   const startTime = performance.now();
   try {
     // Attempt querying employees table
@@ -181,10 +207,24 @@ export async function testSupabaseConnection(): Promise<{
             'Đã kết nối máy chủ Supabase thành công! Tuy nhiên bảng "employees" chưa được tạo. Hãy chạy file migration SQL trong SQL Editor.',
         };
       }
+
+      const isInvalidKey =
+        error.message?.toLowerCase().includes('invalid api key') ||
+        error.message?.toLowerCase().includes('jwt') ||
+        (error as any).status === 401;
+
+      if (isInvalidKey) {
+        return {
+          connected: false,
+          latencyMs,
+          message: `Lỗi: Supabase từ chối với "Invalid API key". Khóa Anon Public hợp lệ của Supabase là mã JWT bắt đầu bằng 'eyJ...' (khoảng 200 ký tự, lấy tại Supabase Dashboard > Settings > API > Project API keys > anon public). Vui lòng không dùng mật khẩu DB hoặc Project Ref.`,
+        };
+      }
+
       return {
         connected: false,
         latencyMs,
-        message: `Lỗi truy vấn Supabase: ${error.message} (Mã lỗi: ${error.code})`,
+        message: `Lỗi truy vấn Supabase: ${error.message} (Mã lỗi: ${error.code || 'undefined'})`,
       };
     }
 

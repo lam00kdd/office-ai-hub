@@ -13,7 +13,13 @@ import {
   WifiOff,
   RefreshCw,
   Zap,
-  Globe
+  Globe,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  ExternalLink
 } from 'lucide-react';
 import {
   getSupabaseCredentials,
@@ -42,6 +48,8 @@ export const DatabaseSchemaModal: React.FC<Props> = ({
   const creds = getSupabaseCredentials();
   const [url, setUrl] = useState(creds.url);
   const [key, setKey] = useState(creds.key);
+  const [showKey, setShowKey] = useState(false);
+  const [showVercelGuide, setShowVercelGuide] = useState(false);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [testResult, setTestResult] = useState<{
@@ -74,8 +82,12 @@ export const DatabaseSchemaModal: React.FC<Props> = ({
     setTesting(true);
     setTestResult(null);
     try {
+      const cleanUrl = url.trim().replace(/\/+$/, '');
+      const cleanKey = key.trim().replace(/^['"]|['"]$/g, '');
+      setUrl(cleanUrl);
+      setKey(cleanKey);
       // Save current input before testing
-      saveSupabaseCredentials(url, key);
+      saveSupabaseCredentials(cleanUrl, cleanKey);
       const res = await testSupabaseConnection();
       setTestResult(res);
       if (showToast) {
@@ -369,10 +381,43 @@ CREATE TABLE exam_attempts (
 
               {/* Form Input URL and Key */}
               <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
-                  <Globe className="w-4 h-4 text-emerald-600" />
-                  Thông tin kết nối Supabase Project (lấy từ Supabase Settings &gt; API)
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                    <Globe className="w-4 h-4 text-emerald-600" />
+                    <span>Thông tin kết nối Supabase Project (lấy từ Supabase Settings &gt; API)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowVercelGuide(!showVercelGuide)}
+                    className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span>{showVercelGuide ? 'Ẩn hướng dẫn Vercel ▲' : 'Cách cài đặt trên Vercel ▼'}</span>
+                  </button>
                 </div>
+
+                {/* Collapsible Vercel Environment Variables Guide */}
+                {showVercelGuide && (
+                  <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-[11px] space-y-2 animate-in fade-in">
+                    <div className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                      <span>🚀 Tại sao bên AI Studio kết nối được mà khi Public lên Vercel lại báo lỗi?</span>
+                    </div>
+                    <p className="text-blue-800 dark:text-blue-300 leading-relaxed text-[11px]">
+                      1. <strong>LocalStorage là riêng biệt theo từng tên miền:</strong> Cài đặt bạn nhập ở link AI Studio chỉ nằm trong trình duyệt của link đó, không tự đồng bộ sang domain Vercel (<code>office-ai-hub.vercel.app</code>).<br />
+                      2. <strong>Để website trên Vercel luôn tự động kết nối cho tất cả mọi người:</strong> Bạn hãy thêm 2 biến sau trong <strong>Vercel Dashboard &gt; Project Settings &gt; Environment Variables</strong>, sau đó bấm <em>Redeploy</em>:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-[10px]">
+                      <div className="p-2 rounded bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 select-all">
+                        <span className="text-slate-500 font-sans block text-[9px] uppercase tracking-wider font-bold">Key 1:</span>
+                        <code className="text-blue-600 dark:text-blue-400 font-bold">VITE_SUPABASE_URL</code>
+                      </div>
+                      <div className="p-2 rounded bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 select-all">
+                        <span className="text-slate-500 font-sans block text-[9px] uppercase tracking-wider font-bold">Key 2:</span>
+                        <code className="text-emerald-600 dark:text-emerald-400 font-bold">VITE_SUPABASE_ANON_KEY</code>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -381,34 +426,75 @@ CREATE TABLE exam_attempts (
                   <input
                     type="text"
                     value={url}
-                    onChange={(e) => setUrl(e.target.value)}
+                    onChange={(e) => setUrl(e.target.value.trim().replace(/\/+$/, ''))}
                     placeholder="https://your-project-ref.supabase.co"
                     className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Supabase Anon Public Key (VITE_SUPABASE_ANON_KEY):
-                  </label>
-                  <input
-                    type="password"
-                    value={key}
-                    onChange={(e) => setKey(e.target.value)}
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Supabase Anon Public Key (VITE_SUPABASE_ANON_KEY):
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {key ? `${key.length} ký tự` : 'Chưa nhập'}
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type={showKey ? 'text' : 'password'}
+                      value={key}
+                      onChange={(e) => setKey(e.target.value.trim().replace(/^['"]|['"]$/g, ''))}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(!showKey)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                      title={showKey ? 'Ẩn khóa' : 'Hiện khóa để kiểm tra chính xác'}
+                    >
+                      {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Realtime Key Validation Warning */}
+                  {key && (
+                    <div className="mt-2">
+                      {key.startsWith('eyJ') && key.length > 80 ? (
+                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          <span>Đúng định dạng Supabase JWT Anon Key ({key.length} ký tự)</span>
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[11px] text-amber-900 dark:text-amber-200 space-y-1.5 animate-in fade-in">
+                          <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
+                            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                            <span>Cảnh báo: Khóa API hiện tại ({key.length} ký tự) không phải là Anon Key!</span>
+                          </div>
+                          <p className="text-[10px] leading-relaxed text-amber-800 dark:text-amber-200/90">
+                            Khóa <strong>anon public</strong> thật của Supabase là một mã JWT dài (thường từ 150 đến 250 ký tự) luôn bắt đầu bằng chữ <code>eyJ...</code>.<br />
+                            Trong Supabase Dashboard tab <strong>API Keys / Settings</strong> của bạn: Hãy tìm mục <strong>Project API keys</strong> &gt; dòng <strong>anon (public)</strong> &gt; bấm nút <strong>Copy</strong> rồi dán vào đây. (Tránh dán Mật khẩu Database hay Personal Access Token sbp_...).
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-[11px] text-slate-500">
-                    💡 Bạn có thể cấu hình trực tiếp trên Vercel qua phần <strong>Environment Variables</strong>.
+                    💡 Khuyên dùng: Nhấn nút <strong>Hiện (Eye)</strong> để kiểm tra chuỗi trước khi lưu.
                   </span>
                   <button
                     onClick={() => handleTestConnection(true)}
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                    disabled={testing}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
                   >
-                    Lưu & Kiểm tra kết nối
+                    <RefreshCw className={`w-3.5 h-3.5 ${testing ? 'animate-spin' : ''}`} />
+                    <span>{testing ? 'Đang kiểm tra...' : 'Lưu & Kiểm tra kết nối'}</span>
                   </button>
                 </div>
               </div>
