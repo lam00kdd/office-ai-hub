@@ -26,6 +26,7 @@ import {
   getSupabaseClient,
   getSupabaseCredentials,
   checkSupabaseGoogleProviderStatus,
+  syncGoogleUserToSupabase,
 } from '../services/supabaseClient';
 import { toast } from '../services/toast';
 
@@ -218,23 +219,46 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  const handleSelectGoogleAccount = (acc: { name: string; email: string; avatar: string }) => {
+  const handleSelectGoogleAccount = async (acc: { name: string; email: string; avatar: string }) => {
     setIsLoading(true);
-    setTimeout(() => {
-      const guestUser = DatabaseService.loginWithGoogle({
+    try {
+      const user = DatabaseService.loginWithGoogle({
         name: acc.name,
         email: acc.email,
         avatar: acc.avatar,
       });
-      onLoginSuccess(guestUser);
-      toast.success(
-        `Đã đăng nhập tài khoản Google: ${guestUser.full_name} (${guestUser.email}). Thông tin khách đã được lưu an toàn vào Database!`,
-        'Xác thực Google OAuth'
-      );
-      setIsLoading(false);
+
+      onLoginSuccess(user);
+
+      // Đồng bộ trực tiếp lên Supabase (cả bảng employees và guests)
+      const syncRes = await syncGoogleUserToSupabase({
+        email: user.email,
+        full_name: user.full_name,
+        avatar_url: user.avatar_url,
+        role: user.role,
+        employee_code: user.employee_code,
+        position: user.position,
+      });
+
+      if (syncRes.success) {
+        toast.success(
+          `Đã đăng nhập ${user.full_name} (${user.email}) và lưu thành công vào Supabase Cloud (bảng: ${syncRes.syncedTables.join(', ')})!`,
+          'Đồng bộ Supabase thành công'
+        );
+      } else {
+        toast.info(
+          `Đã đăng nhập ${user.full_name} vào hệ thống. ${syncRes.message}`,
+          'Đăng nhập Google'
+        );
+      }
+
       setShowGooglePicker(false);
       onClose?.();
-    }, 300);
+    } catch (err: any) {
+      toast.error(`Lỗi đăng nhập: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

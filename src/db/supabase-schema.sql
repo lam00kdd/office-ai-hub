@@ -171,15 +171,12 @@ CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam ON exam_attempts(exam_id);
 CREATE INDEX IF NOT EXISTS idx_attempt_answers_attempt ON attempt_answers(attempt_id);
 
 -- CHÍNH SÁCH BẢO MẬT ROW LEVEL SECURITY (RLS) SUPABASE
-ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
-ALTER TABLE exams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE exam_attempts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE guests ENABLE ROW LEVEL SECURITY;
-
--- Cho phép đọc chung trong nội bộ công ty
-CREATE POLICY "Public Read Employees" ON employees FOR SELECT USING (true);
-CREATE POLICY "Public Read Exams" ON exams FOR SELECT USING (true);
-CREATE POLICY "Public Read Questions" ON questions FOR SELECT USING (true);
-CREATE POLICY "Public Read Attempts" ON exam_attempts FOR SELECT USING (true);
-CREATE POLICY "Allow All on Guests" ON guests FOR ALL USING (true) WITH CHECK (true);
+-- Tắt RLS hoặc cấp quyền ALL để Anon Public Key và Client có thể lưu dữ liệu nhân viên/khách
+ALTER TABLE employees DISABLE ROW LEVEL SECURITY;
+ALTER TABLE guests DISABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE exams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE questions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE exam_attempts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE attempt_answers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE departments DISABLE ROW LEVEL SECURITY;

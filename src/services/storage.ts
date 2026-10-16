@@ -31,7 +31,7 @@ import {
   INITIAL_ATTENDANCE_RECORDS,
   INITIAL_CRIMP_STANDARDS,
 } from './mockData';
-import { syncGuestToSupabase } from './supabaseClient';
+import { syncGuestToSupabase, syncGoogleUserToSupabase } from './supabaseClient';
 
 const STORAGE_KEYS = {
   DEPARTMENTS: 'oai_departments',
@@ -237,13 +237,16 @@ export const DatabaseService = {
     localStorage.setItem(STORAGE_KEYS.GUESTS, JSON.stringify(guests));
     notifyChange(STORAGE_KEYS.GUESTS);
 
-    // Bất đồng bộ đồng bộ thông tin khách lên Supabase (nếu có kết nối)
-    syncGuestToSupabase({
+    // Đồng bộ trực tiếp lên Supabase (cả employees và guests)
+    syncGoogleUserToSupabase({
       email: guest.email,
       full_name: guest.full_name,
       avatar_url: guest.avatar_url,
-      auth_provider: guest.auth_provider || 'google',
-    }).catch(() => {});
+      role: guest.role,
+      employee_code: guest.employee_code,
+      position: guest.position,
+      department_id: guest.department_id,
+    }).catch((err) => console.warn('Supabase sync warning:', err));
   },
 
   loginAsGuest(guestInfo?: { email?: string; name?: string; provider?: 'supabase_auth' | 'guest' | 'google' }): Employee {
@@ -268,42 +271,69 @@ export const DatabaseService = {
     return guestUser;
   },
 
-  // Đăng nhập bằng Google Account - Tự động lưu thông tin khách vào Database
+  // Đăng nhập bằng Google Account - Tự động đồng bộ vào Database (cả bảng employees và guests)
   loginWithGoogle(googleData?: { name?: string; email?: string; avatar?: string; googleId?: string }): Employee {
-    const email = googleData?.email || 'khach.google@gmail.com';
-    const name = googleData?.name || (email.split('@')[0]);
-    const avatar = googleData?.avatar || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&q=80';
+    const email = (googleData?.email || 'khach.google@gmail.com').trim();
+    const isLam = email.toLowerCase() === 'nh.lam19382@gmail.com';
+    const name = googleData?.name || (isLam ? 'Nguyễn Hoàng Lâm' : email.split('@')[0]);
+    const avatar =
+      googleData?.avatar ||
+      (isLam
+        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80'
+        : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&q=80');
 
-    // Kiểm tra xem khách này đã từng ghé thăm trước đó chưa
-    const existingGuests = this.getGuests();
-    const found = existingGuests.find((g) => g.email.toLowerCase() === email.toLowerCase());
+    // Cập nhật hoặc thêm vào danh sách Nhân viên (employees)
+    const employees = this.getEmployees();
+    const empIdx = employees.findIndex((e) => e.email.toLowerCase() === email.toLowerCase());
 
-    const guestUser: Employee = {
-      id: found ? found.id : `guest-gg-${Date.now()}`,
-      employee_code: 'GUEST-GG',
-      full_name: name,
-      email: email,
-      position: 'Khách đăng nhập qua Google OAuth',
-      department_id: 'dept-guest',
-      department_name: 'Khách / Đối tác công cộng',
-      role: 'guest',
-      status: 'active',
-      is_guest: true,
-      auth_provider: 'google',
-      avatar_url: avatar,
-      created_at: found ? found.created_at : new Date().toISOString(),
-    };
+    let targetUser: Employee;
 
-    // Lưu vĩnh viễn vào danh sách khách trong Database
-    this.saveGuestProfile(guestUser);
-    this.login(guestUser);
+    if (empIdx >= 0) {
+      // Đã có trong danh sách nhân viên
+      const emp = employees[empIdx];
+      targetUser = {
+        ...emp,
+        full_name: name || emp.full_name,
+        avatar_url: avatar || emp.avatar_url,
+        auth_provider: 'google',
+        status: 'active',
+        role: isLam ? 'admin' : emp.role,
+      };
+      employees[empIdx] = targetUser;
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+      notifyChange(STORAGE_KEYS.EMPLOYEES);
+    } else {
+      // Tạo nhân viên mới đăng nhập qua Google
+      targetUser = {
+        id: isLam ? 'emp-1' : `emp-gg-${Date.now()}`,
+        employee_code: isLam ? 'NV001' : `GG-${Math.floor(1000 + Math.random() * 9000)}`,
+        full_name: name,
+        email: email,
+        position: isLam ? 'Tổng Quản trị viên (Admin)' : 'Nhân viên đăng nhập Google',
+        department_id: isLam ? 'dept-1' : 'dept-4',
+        department_name: isLam ? 'Phòng Kế toán' : 'Phòng CNTT & Chuyển đổi số',
+        role: isLam ? 'admin' : 'employee',
+        status: 'active',
+        is_guest: false,
+        auth_provider: 'google',
+        avatar_url: avatar,
+        created_at: new Date().toISOString(),
+      };
+      employees.unshift(targetUser);
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+      notifyChange(STORAGE_KEYS.EMPLOYEES);
+    }
+
+    // Lưu vào danh sách khách & lưu trạng thái phiên đăng nhập
+    this.saveGuestProfile(targetUser);
+    this.login(targetUser);
     this.addLog(
       name,
       'Google Login',
       'Xác thực OAuth',
-      `Khách đăng nhập bằng tài khoản Google (${email}), đã lưu hồ sơ vào Database.`
+      `Tài khoản ${name} (${email}) đăng nhập Google, đã đồng bộ vào bảng Nhân viên & Khách.`
     );
-    return guestUser;
+    return targetUser;
   },
 
   changePassword(employeeId: string, oldPass: string, newPass: string): { success: boolean; message: string } {

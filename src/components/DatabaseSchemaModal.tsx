@@ -19,15 +19,19 @@ import {
   AlertTriangle,
   CheckCircle2,
   Info,
-  ExternalLink
+  ExternalLink,
+  Users
 } from 'lucide-react';
 import {
   getSupabaseCredentials,
   saveSupabaseCredentials,
   testSupabaseConnection,
   syncSeedDataToSupabase,
-  checkSupabaseGoogleProviderStatus
+  checkSupabaseGoogleProviderStatus,
+  fetchSupabaseUsers,
+  syncGoogleUserToSupabase,
 } from '../services/supabaseClient';
+import { DatabaseService } from '../services/storage';
 import { toast } from '../services/toast';
 
 interface Props {
@@ -64,6 +68,13 @@ export const DatabaseSchemaModal: React.FC<Props> = ({
     enabled: boolean;
     message: string;
   } | null>(null);
+
+  // Supabase Remote Users Inspection state
+  const [remoteUsers, setRemoteUsers] = useState<{ employees: any[]; guests: any[] } | null>(null);
+  const [loadingRemoteUsers, setLoadingRemoteUsers] = useState(false);
+  const [syncingAllUsers, setSyncingAllUsers] = useState(false);
+  const [showQuickFixSql, setShowQuickFixSql] = useState(false);
+  const [copiedFixSql, setCopiedFixSql] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -130,6 +141,68 @@ export const DatabaseSchemaModal: React.FC<Props> = ({
       }
     } finally {
       setTestingGoogle(false);
+    }
+  };
+
+  const handleFetchRemoteUsers = async () => {
+    setLoadingRemoteUsers(true);
+    try {
+      const data = await fetchSupabaseUsers();
+      setRemoteUsers(data);
+      if (data.error) {
+        toast.error(`Lỗi đọc Supabase: ${data.error}`, 'Supabase Users');
+      } else {
+        const total = data.employees.length + data.guests.length;
+        toast.success(
+          `Tìm thấy ${total} người dùng trên Supabase (${data.employees.length} trong bảng employees, ${data.guests.length} trong bảng guests).`,
+          'Supabase Users'
+        );
+      }
+    } finally {
+      setLoadingRemoteUsers(false);
+    }
+  };
+
+  const handleSyncAllUsers = async () => {
+    setSyncingAllUsers(true);
+    try {
+      const employees = DatabaseService.getEmployees();
+      const guests = DatabaseService.getGuests();
+      let successCount = 0;
+
+      for (const emp of employees) {
+        const res = await syncGoogleUserToSupabase({
+          email: emp.email,
+          full_name: emp.full_name,
+          avatar_url: emp.avatar_url,
+          role: emp.role,
+          employee_code: emp.employee_code,
+          position: emp.position,
+        });
+        if (res.success) successCount++;
+      }
+
+      for (const g of guests) {
+        const res = await syncGoogleUserToSupabase({
+          email: g.email,
+          full_name: g.full_name,
+          avatar_url: g.avatar_url,
+          role: g.role,
+          employee_code: g.employee_code,
+          position: g.position,
+        });
+        if (res.success) successCount++;
+      }
+
+      toast.success(
+        `Đã đồng bộ ${successCount} lượt tài khoản người dùng Google & Nhân sự lên Supabase Cloud!`,
+        'Đồng bộ hoàn tất'
+      );
+      handleFetchRemoteUsers();
+    } catch (err: any) {
+      toast.error(`Lỗi đồng bộ: ${err.message}`);
+    } finally {
+      setSyncingAllUsers(false);
     }
   };
 
@@ -518,6 +591,181 @@ CREATE TABLE exam_attempts (
                   <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
                   <span>{syncing ? 'Đang đồng bộ...' : 'Đẩy dữ liệu mẫu lên Supabase'}</span>
                 </button>
+              </div>
+
+              {/* User Google & Staff Sync Card */}
+              <div className="p-5 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                        Đồng bộ Tài khoản Người dùng Google lên Supabase
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Tự động đẩy vào cả 2 bảng <strong>employees</strong> (nhân sự) và <strong>guests</strong> (khách Google).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleFetchRemoteUsers}
+                      disabled={loadingRemoteUsers || !testResult?.connected}
+                      className="px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 text-slate-800 dark:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingRemoteUsers ? 'animate-spin' : ''}`} />
+                      <span>{loadingRemoteUsers ? 'Đang tải...' : 'Xem User trên Supabase'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSyncAllUsers}
+                      disabled={syncingAllUsers || !testResult?.connected}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+                    >
+                      <Zap className={`w-3.5 h-3.5 ${syncingAllUsers ? 'animate-spin' : ''}`} />
+                      <span>{syncingAllUsers ? 'Đang đẩy...' : 'Đẩy ngay tất cả User lên Supabase'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remote Users Live List Preview */}
+                {remoteUsers && (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2 animate-in fade-in">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      <span>
+                        📋 Danh sách User hiện có trên Supabase ({remoteUsers.employees.length} trong bảng employees, {remoteUsers.guests.length} trong bảng guests):
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRemoteUsers(null)}
+                        className="text-[10px] text-slate-400 hover:text-slate-600"
+                      >
+                        Đóng xem ✕
+                      </button>
+                    </div>
+
+                    {remoteUsers.employees.length === 0 && remoteUsers.guests.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-slate-500">
+                        Chưa có người dùng nào trên bảng Supabase. Hãy nhấn nút <strong>"Đẩy ngay tất cả User lên Supabase"</strong> ở trên!
+                      </div>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-850">
+                        {remoteUsers.employees.map((emp) => (
+                          <div key={emp.id} className="p-2.5 flex items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <img
+                                src={emp.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80'}
+                                alt={emp.full_name}
+                                className="w-6 h-6 rounded-full object-cover shrink-0"
+                              />
+                              <div className="truncate">
+                                <div className="font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                                  <span>{emp.full_name}</span>
+                                  <span className="text-[9px] font-mono px-1.5 py-0.2 bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 rounded">
+                                    {emp.employee_code}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 truncate">{emp.email}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold">
+                                {emp.role === 'admin' ? '👑 Admin' : 'Nhân sự'}
+                              </span>
+                              <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded font-mono">
+                                employees
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+
+                        {remoteUsers.guests.map((g) => (
+                          <div key={g.id} className="p-2.5 flex items-center justify-between gap-3 text-xs bg-purple-50/40 dark:bg-purple-950/20">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <img
+                                src={g.avatar_url || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&q=80'}
+                                alt={g.full_name}
+                                className="w-6 h-6 rounded-full object-cover shrink-0"
+                              />
+                              <div className="truncate">
+                                <div className="font-bold text-slate-900 dark:text-white truncate">{g.full_name}</div>
+                                <div className="text-[10px] text-slate-500 truncate">{g.email}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[10px] text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-2 py-0.5 rounded-full font-semibold">
+                                Google User
+                              </span>
+                              <span className="text-[9px] text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950 px-2 py-0.5 rounded font-mono">
+                                guests
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* RLS and Missing Table Quick Fix SQL */}
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickFixSql(!showQuickFixSql)}
+                    className="text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1.5"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    <span>{showQuickFixSql ? 'Ẩn câu lệnh SQL Fix quyền RLS ▲' : 'Chưa thấy lưu lên bảng? Bấm để xem câu lệnh SQL Fix quyền RLS & Tạo bảng guests ▼'}</span>
+                  </button>
+
+                  {showQuickFixSql && (
+                    <div className="mt-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[11px] space-y-2.5 animate-in fade-in">
+                      <div className="font-bold text-amber-900 dark:text-amber-200">
+                        ⚡ Nguyên nhân và cách khắc phục nếu bảng Supabase chưa nhận dữ liệu:
+                      </div>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                        Mặc định Supabase có thể bật chế độ bảo mật <strong>Row Level Security (RLS)</strong> chặn quyền INSERT/UPDATE của Anon Key, hoặc bảng <strong>guests</strong> chưa được tạo. Hãy copy đoạn mã ngắn dưới đây và dán vào <strong>Supabase Dashboard &gt; SQL Editor &gt; Run</strong>:
+                      </p>
+                      <div className="relative">
+                        <pre className="p-3 bg-slate-900 text-emerald-400 rounded-xl font-mono text-[10px] overflow-x-auto select-all leading-relaxed">
+{`-- 1. TẠO BẢNG GUESTS NẾU CHƯA CÓ
+CREATE TABLE IF NOT EXISTS guests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    auth_provider VARCHAR(50) DEFAULT 'google',
+    avatar_url TEXT,
+    last_login_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. CẤP QUYỀN GHI DỮ LIỆU TỰ DO CHO ANON KEY (TẮT CHẶN RLS)
+ALTER TABLE employees DISABLE ROW LEVEL SECURITY;
+ALTER TABLE guests DISABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_logs DISABLE ROW LEVEL SECURITY;`}
+                        </pre>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sql = `-- 1. TẠO BẢNG GUESTS NẾU CHƯA CÓ\nCREATE TABLE IF NOT EXISTS guests (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    email VARCHAR(255) UNIQUE NOT NULL,\n    full_name VARCHAR(255) NOT NULL,\n    auth_provider VARCHAR(50) DEFAULT 'google',\n    avatar_url TEXT,\n    last_login_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\n);\n\n-- 2. CẤP QUYỀN GHI DỮ LIỆU TỰ DO CHO ANON KEY (TẮT CHẶN RLS)\nALTER TABLE employees DISABLE ROW LEVEL SECURITY;\nALTER TABLE guests DISABLE ROW LEVEL SECURITY;\nALTER TABLE activity_logs DISABLE ROW LEVEL SECURITY;`;
+                            navigator.clipboard.writeText(sql);
+                            setCopiedFixSql(true);
+                            toast.success('Đã sao chép đoạn mã SQL Fix!', 'Sao chép thành công');
+                            setTimeout(() => setCopiedFixSql(false), 2000);
+                          }}
+                          className="absolute right-2 top-2 px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors backdrop-blur-sm"
+                        >
+                          {copiedFixSql ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedFixSql ? 'Đã chép' : 'Sao chép SQL'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

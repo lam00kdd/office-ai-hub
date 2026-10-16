@@ -132,6 +132,151 @@ export async function checkSupabaseGoogleProviderStatus(): Promise<{
   }
 }
 
+// Đồng bộ toàn diện thông tin người dùng Google lên cả 2 bảng employees và guests của Supabase
+export async function syncGoogleUserToSupabase(user: {
+  email: string;
+  full_name: string;
+  avatar_url?: string;
+  role?: string;
+  employee_code?: string;
+  position?: string;
+  department_id?: string;
+  auth_provider?: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+  syncedTables: string[];
+  errors: string[];
+}> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      message: 'Chưa cấu hình hoặc chưa kết nối Supabase Client.',
+      syncedTables: [],
+      errors: ['No client initialized'],
+    };
+  }
+
+  const email = (user.email || '').trim();
+  const fullName = (user.full_name || email.split('@')[0] || 'User').trim();
+  const avatarUrl = user.avatar_url || '';
+  const isLamAdmin = email.toLowerCase() === 'nh.lam19382@gmail.com';
+  const role = isLamAdmin ? 'admin' : (user.role || 'staff');
+  const code = user.employee_code || (isLamAdmin ? 'NV001' : `GG-${Math.floor(1000 + Math.random() * 9000)}`);
+  const position = user.position || (isLamAdmin ? 'Tổng Quản trị viên (Admin)' : 'Nhân viên Google Account');
+
+  const syncedTables: string[] = [];
+  const errors: string[] = [];
+
+  // 1. Đồng bộ vào bảng "employees"
+  try {
+    const { data: existingList, error: queryErr } = await client
+      .from('employees')
+      .select('id, employee_code, email')
+      .eq('email', email)
+      .limit(1);
+
+    if (queryErr) {
+      errors.push(`Bảng "employees": ${queryErr.message}`);
+    } else if (existingList && existingList.length > 0) {
+      const existing = existingList[0];
+      const { error: updateErr } = await client
+        .from('employees')
+        .update({
+          full_name: fullName,
+          avatar_url: avatarUrl,
+          status: 'active',
+          role: isLamAdmin ? 'admin' : role,
+          position: position,
+        })
+        .eq('id', existing.id);
+
+      if (updateErr) {
+        errors.push(`Cập nhật "employees": ${updateErr.message}`);
+      } else {
+        syncedTables.push('employees');
+      }
+    } else {
+      const { error: insertErr } = await client.from('employees').insert([
+        {
+          employee_code: code,
+          full_name: fullName,
+          email: email,
+          role: role,
+          position: position,
+          status: 'active',
+          avatar_url: avatarUrl,
+        },
+      ]);
+
+      if (insertErr) {
+        errors.push(`Thêm mới "employees": ${insertErr.message}`);
+      } else {
+        syncedTables.push('employees');
+      }
+    }
+  } catch (err: any) {
+    errors.push(`Lỗi kết nối "employees": ${err.message}`);
+  }
+
+  // 2. Đồng bộ vào bảng "guests"
+  try {
+    const { error: guestErr } = await client.from('guests').upsert(
+      {
+        email: email,
+        full_name: fullName,
+        avatar_url: avatarUrl,
+        auth_provider: 'google',
+        last_login_at: new Date().toISOString(),
+      },
+      { onConflict: 'email' }
+    );
+
+    if (guestErr) {
+      if (guestErr.code === '42P01') {
+        errors.push(`Bảng "guests" chưa được tạo trên Supabase`);
+      } else {
+        errors.push(`Bảng "guests": ${guestErr.message}`);
+      }
+    } else {
+      syncedTables.push('guests');
+    }
+  } catch (err: any) {
+    errors.push(`Lỗi bảng "guests": ${err.message}`);
+  }
+
+  // 3. Ghi log hoạt động vào "activity_logs"
+  try {
+    const { error: logErr } = await client.from('activity_logs').insert([
+      {
+        employee_name: fullName,
+        action: 'Đăng nhập Google Account',
+        module: 'Xác thực',
+        details: `Tài khoản ${fullName} (${email}) đã đăng nhập qua Google.`,
+      },
+    ]);
+    if (!logErr) syncedTables.push('activity_logs');
+  } catch {
+    // Không chặn luồng nếu log phụ có lỗi
+  }
+
+  const success = syncedTables.length > 0;
+  let message = '';
+  if (success) {
+    message = `Đã lưu tài khoản ${fullName} vào Supabase (Bảng: ${syncedTables.join(', ')})!`;
+  } else {
+    message = `Chưa thể lưu lên Supabase: ${errors.join('; ')}`;
+  }
+
+  return {
+    success,
+    message,
+    syncedTables,
+    errors,
+  };
+}
+
 // Đồng bộ thông tin Khách đăng nhập (Google/Supabase) lên bảng guests của Supabase
 export async function syncGuestToSupabase(guest: {
   email: string;
@@ -139,29 +284,37 @@ export async function syncGuestToSupabase(guest: {
   avatar_url?: string;
   auth_provider?: string;
 }): Promise<{ success: boolean; message?: string }> {
+  const res = await syncGoogleUserToSupabase({
+    email: guest.email,
+    full_name: guest.full_name,
+    avatar_url: guest.avatar_url,
+    auth_provider: guest.auth_provider,
+  });
+  return { success: res.success, message: res.message };
+}
+
+// Đọc danh sách tài khoản thực tế đang có trên Supabase để người dùng kiểm chứng
+export async function fetchSupabaseUsers(): Promise<{
+  employees: any[];
+  guests: any[];
+  error?: string;
+}> {
   const client = getSupabaseClient();
-  if (!client) return { success: false, message: 'Chưa kết nối Supabase' };
+  if (!client) return { employees: [], guests: [], error: 'Chưa kết nối Supabase' };
 
   try {
-    const { error } = await client.from('guests').upsert(
-      {
-        email: guest.email,
-        full_name: guest.full_name,
-        avatar_url: guest.avatar_url || '',
-        auth_provider: guest.auth_provider || 'google',
-        last_login_at: new Date().toISOString(),
-      },
-      { onConflict: 'email' }
-    );
+    const [empRes, guestRes] = await Promise.all([
+      client.from('employees').select('id, employee_code, full_name, email, role, position, status, avatar_url, created_at').order('created_at', { ascending: false }).limit(25),
+      client.from('guests').select('id, email, full_name, auth_provider, avatar_url, last_login_at').order('last_login_at', { ascending: false }).limit(25),
+    ]);
 
-    if (error) {
-      // Bảng guests có thể chưa được tạo nếu người dùng chưa chạy script SQL
-      console.warn('Sync to Supabase guests table warning (Run SQL schema if table not created):', error.message);
-      return { success: false, message: error.message };
-    }
-    return { success: true, message: 'Đã đồng bộ thông tin khách vào bảng guests trên Supabase!' };
+    return {
+      employees: empRes.data || [],
+      guests: guestRes.data || [],
+      error: empRes.error ? empRes.error.message : (guestRes.error && guestRes.error.code !== '42P01' ? guestRes.error.message : undefined),
+    };
   } catch (err: any) {
-    return { success: false, message: err.message };
+    return { employees: [], guests: [], error: err.message };
   }
 }
 
