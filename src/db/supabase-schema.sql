@@ -148,9 +148,21 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 11. BẢNG KHÁCH & ĐỐI TÁC ĐĂNG NHẬP GOOGLE / SUPABASE AUTH (guests)
+CREATE TABLE IF NOT EXISTS guests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    auth_provider VARCHAR(50) DEFAULT 'google',
+    avatar_url TEXT,
+    last_login_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- TẠO CHỈ MỤC TỐI ƯU TRUY VẤN
 CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department_id);
 CREATE INDEX IF NOT EXISTS idx_employees_code ON employees(employee_code);
+CREATE INDEX IF NOT EXISTS idx_guests_email ON guests(email);
 CREATE INDEX IF NOT EXISTS idx_questions_topic ON questions(topic);
 CREATE INDEX IF NOT EXISTS idx_questions_difficulty ON questions(difficulty);
 CREATE INDEX IF NOT EXISTS idx_exam_assignments_emp ON exam_assignments(employee_id);
@@ -163,9 +175,11 @@ ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE guests ENABLE ROW LEVEL SECURITY;
 
 -- Cho phép đọc chung trong nội bộ công ty
 CREATE POLICY "Public Read Employees" ON employees FOR SELECT USING (true);
 CREATE POLICY "Public Read Exams" ON exams FOR SELECT USING (true);
 CREATE POLICY "Public Read Questions" ON questions FOR SELECT USING (true);
 CREATE POLICY "Public Read Attempts" ON exam_attempts FOR SELECT USING (true);
+CREATE POLICY "Allow All on Guests" ON guests FOR ALL USING (true) WITH CHECK (true);

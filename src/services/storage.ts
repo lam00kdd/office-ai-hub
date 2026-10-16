@@ -31,6 +31,7 @@ import {
   INITIAL_ATTENDANCE_RECORDS,
   INITIAL_CRIMP_STANDARDS,
 } from './mockData';
+import { syncGuestToSupabase } from './supabaseClient';
 
 const STORAGE_KEYS = {
   DEPARTMENTS: 'oai_departments',
@@ -235,6 +236,14 @@ export const DatabaseService = {
     }
     localStorage.setItem(STORAGE_KEYS.GUESTS, JSON.stringify(guests));
     notifyChange(STORAGE_KEYS.GUESTS);
+
+    // Bất đồng bộ đồng bộ thông tin khách lên Supabase (nếu có kết nối)
+    syncGuestToSupabase({
+      email: guest.email,
+      full_name: guest.full_name,
+      avatar_url: guest.avatar_url,
+      auth_provider: guest.auth_provider || 'google',
+    }).catch(() => {});
   },
 
   loginAsGuest(guestInfo?: { email?: string; name?: string; provider?: 'supabase_auth' | 'guest' | 'google' }): Employee {

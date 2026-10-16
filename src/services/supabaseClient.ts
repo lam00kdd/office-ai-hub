@@ -58,6 +58,95 @@ export function getSupabaseClient(): SupabaseClient | null {
   }
 }
 
+// Kiểm tra trạng thái Google Provider trên Supabase mà không làm văng ra trang lỗi thô 400
+export async function checkSupabaseGoogleProviderStatus(): Promise<{
+  enabled: boolean;
+  message: string;
+  authUrl?: string;
+}> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      enabled: false,
+      message: 'Chưa cấu hình Supabase URL hoặc Anon Key trong ứng dụng.',
+    };
+  }
+
+  try {
+    const { data, error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+        skipBrowserRedirect: true, // Không tự động chuyển hướng nếu có lỗi
+      },
+    });
+
+    if (error) {
+      if (error.message?.includes('not enabled') || (error as any).code === 400 || (error as any).status === 400) {
+        return {
+          enabled: false,
+          message: 'Google Provider chưa được bật trên Supabase Dashboard (Lỗi 400: Unsupported provider).',
+        };
+      }
+      return {
+        enabled: false,
+        message: `Lỗi kiểm tra Supabase: ${error.message}`,
+      };
+    }
+
+    if (data?.url) {
+      return {
+        enabled: true,
+        message: 'Google Provider đã được kích hoạt thành công trên Supabase!',
+        authUrl: data.url,
+      };
+    }
+
+    return {
+      enabled: false,
+      message: 'Không nhận được đường dẫn xác thực OAuth từ Supabase.',
+    };
+  } catch (err: any) {
+    return {
+      enabled: false,
+      message: err.message || 'Lỗi mạng khi kiểm tra Supabase Google OAuth',
+    };
+  }
+}
+
+// Đồng bộ thông tin Khách đăng nhập (Google/Supabase) lên bảng guests của Supabase
+export async function syncGuestToSupabase(guest: {
+  email: string;
+  full_name: string;
+  avatar_url?: string;
+  auth_provider?: string;
+}): Promise<{ success: boolean; message?: string }> {
+  const client = getSupabaseClient();
+  if (!client) return { success: false, message: 'Chưa kết nối Supabase' };
+
+  try {
+    const { error } = await client.from('guests').upsert(
+      {
+        email: guest.email,
+        full_name: guest.full_name,
+        avatar_url: guest.avatar_url || '',
+        auth_provider: guest.auth_provider || 'google',
+        last_login_at: new Date().toISOString(),
+      },
+      { onConflict: 'email' }
+    );
+
+    if (error) {
+      // Bảng guests có thể chưa được tạo nếu người dùng chưa chạy script SQL
+      console.warn('Sync to Supabase guests table warning (Run SQL schema if table not created):', error.message);
+      return { success: false, message: error.message };
+    }
+    return { success: true, message: 'Đã đồng bộ thông tin khách vào bảng guests trên Supabase!' };
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
 // Test connection and measure ping latency
 export async function testSupabaseConnection(): Promise<{
   connected: boolean;

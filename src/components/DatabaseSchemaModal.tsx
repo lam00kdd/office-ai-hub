@@ -19,14 +19,15 @@ import {
   getSupabaseCredentials,
   saveSupabaseCredentials,
   testSupabaseConnection,
-  syncSeedDataToSupabase
+  syncSeedDataToSupabase,
+  checkSupabaseGoogleProviderStatus
 } from '../services/supabaseClient';
 import { toast } from '../services/toast';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  defaultTab?: 'connect' | 'erd' | 'wireframe' | 'sql';
+  defaultTab?: 'connect' | 'google-oauth' | 'erd' | 'wireframe' | 'sql';
 }
 
 export const DatabaseSchemaModal: React.FC<Props> = ({
@@ -34,7 +35,7 @@ export const DatabaseSchemaModal: React.FC<Props> = ({
   onClose,
   defaultTab = 'connect',
 }) => {
-  const [activeTab, setActiveTab] = useState<'connect' | 'erd' | 'wireframe' | 'sql'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'connect' | 'google-oauth' | 'erd' | 'wireframe' | 'sql'>(defaultTab);
   const [copied, setCopied] = useState(false);
 
   // Connection settings state
@@ -46,6 +47,13 @@ export const DatabaseSchemaModal: React.FC<Props> = ({
   const [testResult, setTestResult] = useState<{
     connected: boolean;
     latencyMs?: number;
+    message: string;
+  } | null>(null);
+
+  // Google OAuth testing state
+  const [testingGoogle, setTestingGoogle] = useState(false);
+  const [googleStatus, setGoogleStatus] = useState<{
+    enabled: boolean;
     message: string;
   } | null>(null);
 
@@ -96,6 +104,23 @@ export const DatabaseSchemaModal: React.FC<Props> = ({
     }
   };
 
+  const handleTestGoogleProvider = async () => {
+    setTestingGoogle(true);
+    setGoogleStatus(null);
+    try {
+      saveSupabaseCredentials(url, key);
+      const res = await checkSupabaseGoogleProviderStatus();
+      setGoogleStatus(res);
+      if (res.enabled) {
+        toast.success(res.message, 'Google OAuth');
+      } else {
+        toast.error(res.message, 'Google Provider');
+      }
+    } finally {
+      setTestingGoogle(false);
+    }
+  };
+
   const copySQL = () => {
     const sqlText = `-- OFFICE AI HUB - SUPABASE POSTGRESQL SCHEMA
 -- Xem chi tiết tại src/db/supabase-schema.sql
@@ -119,6 +144,16 @@ CREATE TABLE employees (
     position VARCHAR(150) NOT NULL,
     role VARCHAR(50) NOT NULL DEFAULT 'employee',
     status VARCHAR(50) NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE guests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    auth_provider VARCHAR(50) DEFAULT 'google',
+    avatar_url TEXT,
+    last_login_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE questions (
@@ -165,6 +200,13 @@ CREATE TABLE exam_attempts (
       pks: ['id (UUID)'],
       fks: ['department_id -> departments(id)'],
       cols: ['employee_code (UNIQUE)', 'full_name', 'email (UNIQUE)', 'position', 'role', 'status'],
+    },
+    {
+      name: 'guests',
+      desc: 'Lưu trữ thông tin khách/đối tác đăng nhập qua Google OAuth hoặc Supabase Auth',
+      pks: ['id (UUID)'],
+      fks: [],
+      cols: ['email (UNIQUE)', 'full_name', 'auth_provider', 'avatar_url', 'last_login_at'],
     },
     {
       name: 'departments',
@@ -240,6 +282,17 @@ CREATE TABLE exam_attempts (
             }`}
           >
             <Wifi className="w-4 h-4" /> Kết nối & Đồng bộ Supabase
+          </button>
+          <button
+            onClick={() => setActiveTab('google-oauth')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${
+              activeTab === 'google-oauth'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <Globe className="w-4 h-4 text-blue-500" />
+            <span>Kích hoạt Google OAuth</span>
           </button>
           <button
             onClick={() => setActiveTab('erd')}
@@ -379,6 +432,141 @@ CREATE TABLE exam_attempts (
                   <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
                   <span>{syncing ? 'Đang đồng bộ...' : 'Đẩy dữ liệu mẫu lên Supabase'}</span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'google-oauth' && (
+            <div className="space-y-5">
+              {/* Status Header Box */}
+              <div
+                className={`p-4 rounded-2xl border flex items-start justify-between gap-4 transition-all ${
+                  googleStatus?.enabled
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800'
+                    : googleStatus
+                    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
+                    : 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      googleStatus?.enabled
+                        ? 'bg-emerald-600 text-white'
+                        : googleStatus
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-blue-600 text-white'
+                    }`}
+                  >
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>Trạng thái Google OAuth trên Supabase:</span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          googleStatus?.enabled
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                            : googleStatus
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                            : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        {googleStatus?.enabled ? 'Đã kích hoạt (Sẵn sàng)' : googleStatus ? 'Chưa kích hoạt (Lỗi 400)' : 'Chưa kiểm tra'}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                      {googleStatus?.message ||
+                        'Nhấn nút kiểm tra bên cạnh để xác định xem Google Provider đã được bật trên dự án Supabase của bạn hay chưa mà không bị gián đoạn trình duyệt.'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleTestGoogleProvider}
+                  disabled={testingGoogle}
+                  className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white shadow-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shrink-0"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${testingGoogle ? 'animate-spin' : ''}`} />
+                  <span>{testingGoogle ? 'Đang kiểm tra...' : 'Kiểm tra trạng thái'}</span>
+                </button>
+              </div>
+
+              {/* Step-by-Step Activation Guide */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  Hướng dẫn 3 bước kích hoạt đăng nhập Google qua Supabase
+                </div>
+
+                <div className="space-y-3.5 text-xs">
+                  {/* Step 1 */}
+                  <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2">
+                    <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                      <span>Bước 1: Lấy URL chuyển hướng (Redirect Callback URI)</span>
+                      <span className="text-[10px] text-blue-600 font-normal">Cần dán vào Google Cloud</span>
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-400 text-[11px]">
+                      Dán URL callback này vào phần <strong>Authorized redirect URIs</strong> trên Google Cloud Console:
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-blue-600 dark:text-blue-400 font-mono text-[11px] select-all break-all border border-slate-200 dark:border-slate-700">
+                        {url ? `${url.replace(/\/+$/, '')}/auth/v1/callback` : 'https://[ma-project].supabase.co/auth/v1/callback'}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cb = url ? `${url.replace(/\/+$/, '')}/auth/v1/callback` : 'https://[ma-project].supabase.co/auth/v1/callback';
+                          navigator.clipboard.writeText(cb);
+                          toast.info('Đã sao chép Callback URI');
+                        }}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shrink-0"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Sao chép</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl space-y-1.5">
+                    <div className="font-bold text-slate-800 dark:text-slate-200">
+                      Bước 2: Tạo OAuth Client ID trên Google Cloud Console
+                    </div>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400 text-[11px] pl-1">
+                      <li>Truy cập <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-600 underline font-medium">Google Cloud Console &gt; Credentials</a>.</li>
+                      <li>Nhấn <strong>Create Credentials</strong> &gt; chọn <strong>OAuth client ID</strong>.</li>
+                      <li>Application type: chọn <strong>Web application</strong>.</li>
+                      <li>Dán Callback URI ở Bước 1 vào mục <strong>Authorized redirect URIs</strong>.</li>
+                      <li>Nhấn <strong>Create</strong> để nhận <code>Client ID</code> và <code>Client Secret</code>.</li>
+                    </ol>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl space-y-1.5">
+                    <div className="font-bold text-slate-800 dark:text-slate-200">
+                      Bước 3: Dán khóa vào Supabase Dashboard &amp; Bật Provider
+                    </div>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400 text-[11px] pl-1">
+                      <li>Truy cập <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-blue-600 underline font-medium">Supabase Dashboard</a> &gt; chọn dự án của bạn.</li>
+                      <li>Vào mục <strong>Authentication</strong> &gt; chọn tab <strong>Providers</strong> &gt; tìm mục <strong>Google</strong>.</li>
+                      <li>Gạt công tắc sang <strong>Enable Google provider</strong>.</li>
+                      <li>Dán <code>Client ID</code> và <code>Client Secret</code> vừa lấy ở Bước 2 vào &gt; Nhấn <strong>Save</strong>.</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+
+              {/* Guest Profile Saving Information */}
+              <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-start gap-3">
+                <Check className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-emerald-900 dark:text-emerald-200 space-y-1">
+                  <strong>Tự động lưu thông tin khách vào Database:</strong>
+                  <p className="text-[11px] text-emerald-800 dark:text-emerald-300/90 leading-relaxed">
+                    Mỗi khi khách đăng nhập bằng tài khoản Google (hoặc dùng bộ chọn tài khoản trực tiếp trong ứng dụng), hệ thống sẽ tự động lưu hồ sơ khách (Họ tên, Email, Ảnh đại diện, Thời gian đăng nhập) vào bảng CSDL <code>guests</code> và hiển thị trong mục Quản lý Nhân sự &gt; Khách vãng lai.
+                  </p>
+                </div>
               </div>
             </div>
           )}

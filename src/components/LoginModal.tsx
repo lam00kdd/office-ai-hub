@@ -17,11 +17,16 @@ import {
   AlertCircle,
   HelpCircle,
   Check,
-  Users
+  Users,
+  Copy,
 } from 'lucide-react';
 import { Employee } from '../types';
 import { DatabaseService } from '../services/storage';
-import { getSupabaseClient } from '../services/supabaseClient';
+import {
+  getSupabaseClient,
+  getSupabaseCredentials,
+  checkSupabaseGoogleProviderStatus,
+} from '../services/supabaseClient';
 import { toast } from '../services/toast';
 
 interface LoginModalProps {
@@ -188,48 +193,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setShowGooglePicker((prev) => !prev);
   };
 
-  // Thử kết nối trực tiếp với Supabase Google OAuth (với skipBrowserRedirect để kiểm tra trước)
+  // Thử kết nối trực tiếp với Supabase Google OAuth (Kiểm tra an toàn, ngăn chặn hoàn toàn lỗi 400 làm đơ trang)
   const handleTestSupabaseGoogleOAuth = async () => {
     setIsLoading(true);
     setSupabaseGoogleError(null);
     try {
-      const supabase = getSupabaseClient();
-      if (!supabase) {
-        setSupabaseGoogleError('Chưa cấu hình Supabase URL hoặc Anon Key trong ứng dụng.');
+      const status = await checkSupabaseGoogleProviderStatus();
+      if (!status.enabled) {
+        setSupabaseGoogleError(status.message);
         setShowSupabaseGuide(true);
         setIsLoading(false);
         return;
       }
 
-      // skipBrowserRedirect: true ngăn chặn Supabase tự động nhảy sang trang lỗi JSON thô
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) {
-        if (error.message?.includes('not enabled') || (error as any).code === 400) {
-          setSupabaseGoogleError(
-            'Google Provider chưa được BẬT trên Supabase Dashboard (Lỗi 400: Unsupported provider). Vui lòng xem hướng dẫn 3 bước bên dưới để kích hoạt.'
-          );
-        } else {
-          setSupabaseGoogleError(`Lỗi từ Supabase: ${error.message}`);
-        }
-        setShowSupabaseGuide(true);
-        setIsLoading(false);
-        return;
-      }
-
-      if (data?.url) {
-        // Provider đã được bật trên Supabase! Chuyển hướng an toàn
-        window.location.href = data.url;
+      if (status.authUrl) {
+        // Provider đã được bật trên Supabase! Chuyển hướng an toàn tới màn hình cấp quyền Google
+        window.location.href = status.authUrl;
       }
     } catch (err: any) {
       setSupabaseGoogleError(err.message || 'Lỗi kiểm tra kết nối Supabase Google OAuth');
       setShowSupabaseGuide(true);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -605,31 +589,69 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
                       {/* Error Banner when provider is not enabled on Supabase */}
                       {supabaseGoogleError && (
-                        <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-[11px] text-amber-900 dark:text-amber-200 space-y-1 animate-in fade-in">
+                        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-[11px] text-amber-900 dark:text-amber-200 space-y-2 animate-in fade-in">
                           <div className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
                             <span>⚠️ {supabaseGoogleError}</span>
                           </div>
-                          <div className="text-[10px] text-amber-700 dark:text-amber-300/80">
-                            Hệ thống đã tự động ngăn chuyển hướng lỗi để không làm đơ trang. Bạn hãy bấm chọn tài khoản Google ở trên để đăng nhập ngay mà không cần chờ Supabase!
+                          <div className="text-[10px] text-amber-700 dark:text-amber-300/80 leading-relaxed">
+                            Hệ thống đã tự động bảo vệ trình duyệt của bạn khỏi màn hình lỗi trắng trang. Bạn có thể đăng nhập ngay bằng tài khoản Google của mình bên dưới để lưu hồ sơ vào Database và tiếp tục làm việc mà không cần chờ cấu hình Supabase:
                           </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleSelectGoogleAccount({
+                                name: 'Nguyễn Hoàng Lâm',
+                                email: 'nh.lam19382@gmail.com',
+                                avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+                              })
+                            }
+                            className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm shadow-blue-500/25"
+                          >
+                            <span>👉 Đăng nhập ngay với nh.lam19382@gmail.com</span>
+                          </button>
                         </div>
                       )}
 
                       {/* 3-Step Setup Guide */}
                       {showSupabaseGuide && (
                         <div className="p-3 rounded-xl bg-white dark:bg-slate-750 border border-slate-200 dark:border-slate-650 text-[11px] space-y-2 text-slate-700 dark:text-slate-300">
-                          <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                          <div className="font-bold text-slate-900 dark:text-white flex items-center justify-between">
                             <span>📋 3 bước kích hoạt Google Provider trên Supabase:</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowSupabaseGuide(false)}
+                              className="text-[10px] text-slate-400 hover:text-slate-600"
+                            >
+                              Ẩn ✕
+                            </button>
                           </div>
-                          <ol className="list-decimal list-inside space-y-1 text-[11px] pl-1 text-slate-600 dark:text-slate-400">
+                          <ol className="list-decimal list-inside space-y-1.5 text-[11px] pl-1 text-slate-600 dark:text-slate-400">
                             <li>
                               Vào <strong>Google Cloud Console</strong> &gt; APIs &amp; Services &gt; Credentials &gt; Tạo <strong>OAuth 2.0 Client ID</strong> (Web).
                             </li>
                             <li>
                               Thêm Authorized redirect URI:
-                              <code className="block mt-0.5 p-1 bg-slate-100 dark:bg-slate-800 text-blue-600 font-mono text-[10px] rounded select-all break-all">
-                                https://[project-id].supabase.co/auth/v1/callback
-                              </code>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <code className="flex-1 p-1.5 bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-mono text-[10px] rounded select-all break-all border border-slate-200 dark:border-slate-700">
+                                  {getSupabaseCredentials().url
+                                    ? `${getSupabaseCredentials().url.replace(/\/+$/, '')}/auth/v1/callback`
+                                    : 'https://[ma-project].supabase.co/auth/v1/callback'}
+                                </code>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const cb = getSupabaseCredentials().url
+                                      ? `${getSupabaseCredentials().url.replace(/\/+$/, '')}/auth/v1/callback`
+                                      : 'https://[ma-project].supabase.co/auth/v1/callback';
+                                    navigator.clipboard.writeText(cb);
+                                    toast.info('Đã sao chép Callback URI');
+                                  }}
+                                  className="px-2 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-[10px] font-bold shrink-0 flex items-center gap-1"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </button>
+                              </div>
                             </li>
                             <li>
                               Vào <strong>Supabase Dashboard</strong> &gt; <strong>Authentication</strong> &gt; <strong>Providers</strong> &gt; tìm <strong>Google</strong> &gt; Bật <strong>"Enable Google provider"</strong> &gt; Dán Client ID &amp; Secret &gt; Nhấn <strong>Save</strong>.
